@@ -1,32 +1,12 @@
-import { css } from '@emotion/css';
-import { memo, useMemo, useState } from 'react';
-import AutoSizer from 'react-virtualized-auto-sizer';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import {
-  applyFieldOverrides,
-  type DataFrame,
-  type DataLinkClickEvent,
-  type Field,
-  FieldType,
-  type GrafanaTheme2,
-  MappingType,
-  escapeStringForRegex,
-} from '@grafana/data';
-import {
-  IconButton,
-  Table,
-  TableCellDisplayMode,
-  type TableCustomCellOptions,
-  type TableFieldOptions,
-  type TableSortByFieldState,
-  useStyles2,
-  useTheme2,
-} from '@grafana/ui';
+import { Icon, type IconType } from '@components/core/Icon';
 
-import { diffColorBlindColors, diffDefaultColors } from '../FlameGraph/colors';
 import { type FlameGraphDataContainer } from '../FlameGraph/dataTransform';
-import { TOP_TABLE_COLUMN_WIDTH } from '../constants';
-import { type ColorScheme, ColorSchemeDiff, type TableData } from '../types';
+import { escapeRegex } from '../format';
+import { type TableData } from '../types';
+
+import './FlameGraphTopTableContainer.css';
 
 type Props = {
   data: FlameGraphDataContainer;
@@ -39,8 +19,19 @@ type Props = {
   onSearch: (str: string) => void;
   onSandwich: (str?: string) => void;
   onTableSort?: (sort: string) => void;
-  colorScheme: ColorScheme | ColorSchemeDiff;
 };
+
+type SortColumn = 'Symbol' | 'Self' | 'Total';
+type SortDirection = 'asc' | 'desc';
+type SortState = { column: SortColumn; direction: SortDirection };
+
+type Row = { symbol: string; self: number; total: number };
+
+// Rows are uniform — measured from a default-styled <tr>. Adjusting this is
+// a one-character change but the virtualizer math depends on it being exact.
+const ROW_HEIGHT = 25;
+const OVERSCAN_ROWS = 8;
+const HEADER_HEIGHT = 27;
 
 const FlameGraphTopTableContainer = memo(
   ({
@@ -52,343 +43,354 @@ const FlameGraphTopTableContainer = memo(
     sandwichItem,
     onSandwich,
     onTableSort,
-    colorScheme,
   }: Props) => {
-    const table = useMemo(() => buildFilteredTable(data, matchedLabels), [data, matchedLabels]);
+    const rows = useMemo(() => {
+      const grouped = buildFilteredTable(data, matchedLabels);
+      return Object.entries(grouped).map(([symbol, v]) => ({
+        symbol,
+        self: v.self ?? 0,
+        total: v.total ?? 0,
+      }));
+    }, [data, matchedLabels]);
 
-    const styles = useStyles2(getStyles);
-    const theme = useTheme2();
+    const [sort, setSort] = useState<SortState>({
+      column: 'Self',
+      direction: 'desc',
+    });
 
-    const [sort, setSort] = useState<TableSortByFieldState[]>([{ displayName: 'Self', desc: true }]);
+    const sortedRows = useMemo(() => {
+      const dir = sort.direction === 'asc' ? 1 : -1;
+      const copy = rows.slice();
+      copy.sort((a, b) => {
+        if (sort.column === 'Symbol')
+          return a.symbol.localeCompare(b.symbol) * dir;
+        const av = sort.column === 'Self' ? a.self : a.total;
+        const bv = sort.column === 'Self' ? b.self : b.total;
+        return (av - bv) * dir;
+      });
+      return copy;
+    }, [rows, sort]);
+
+    const handleSort = useCallback(
+      (column: SortColumn) => {
+        setSort((prev) => {
+          const next: SortState =
+            prev.column === column
+              ? {
+                  column,
+                  direction: prev.direction === 'desc' ? 'asc' : 'desc',
+                }
+              : { column, direction: column === 'Symbol' ? 'asc' : 'desc' };
+          onTableSort?.(`${next.column}_${next.direction}`);
+          return next;
+        });
+      },
+      [onTableSort],
+    );
+
+    // Virtualization: track scroll offset + viewport height of the scroll
+    // container so we only render visible rows. Without this, the ~1k rows in
+    // a real profile cause a noticeable jank when switching to Top Table.
+    const scrollRef = useRef<HTMLDivElement>(null);
+    const [scrollTop, setScrollTop] = useState(0);
+    const [viewportH, setViewportH] = useState(600);
+    useEffect(() => {
+      const el = scrollRef.current;
+      if (!el) return;
+      const onScroll = () => setScrollTop(el.scrollTop);
+      el.addEventListener('scroll', onScroll, { passive: true });
+      const ro = new ResizeObserver((entries) => {
+        for (const entry of entries) setViewportH(entry.contentRect.height);
+      });
+      ro.observe(el);
+      setViewportH(el.clientHeight);
+      return () => {
+        el.removeEventListener('scroll', onScroll);
+        ro.disconnect();
+      };
+    }, []);
+
+    // Subtract HEADER_HEIGHT from the visible window because the sticky thead
+    // covers that many pixels at the top of the scroll container.
+    const visibleBodyH = Math.max(0, viewportH - HEADER_HEIGHT);
+    const firstVisible = Math.max(
+      0,
+      Math.floor((scrollTop - HEADER_HEIGHT) / ROW_HEIGHT),
+    );
+    const lastVisible = Math.min(
+      sortedRows.length,
+      Math.ceil((scrollTop + visibleBodyH) / ROW_HEIGHT) + 1,
+    );
+    const startIdx = Math.max(0, firstVisible - OVERSCAN_ROWS);
+    const endIdx = Math.min(sortedRows.length, lastVisible + OVERSCAN_ROWS);
+    const padTop = startIdx * ROW_HEIGHT;
+    const padBottom = (sortedRows.length - endIdx) * ROW_HEIGHT;
 
     return (
-      <div className={styles.topTableContainer} data-testid="topTable">
-        <AutoSizer style={{ width: '100%' }}>
-          {({ width, height }) => {
-            if (width < 3 || height < 3) {
-              return null;
-            }
-
-            const frame = buildTableDataFrame(
-              data,
-              table,
-              width,
-              onSymbolClick,
-              onSearch,
-              onSandwich,
-              theme,
-              colorScheme,
-              search,
-              sandwichItem
-            );
-            return (
-              <Table
-                initialSortBy={sort}
-                onSortByChange={(s) => {
-                  if (s && s.length) {
-                    onTableSort?.(s[0].displayName + '_' + (s[0].desc ? 'desc' : 'asc'));
-                  }
-                  setSort(s);
-                }}
-                data={frame}
-                width={width}
-                height={height}
-              />
-            );
-          }}
-        </AutoSizer>
+      <div className={'fg-tt-container'} data-testid="topTable">
+        <div ref={scrollRef} className={'fg-tt-scroll'}>
+          <table className={'fg-tt-table'} role="table">
+            <thead className={'fg-tt-thead'}>
+              <tr role="row" className={'fg-tt-header-row'}>
+                <th
+                  aria-label="Row actions"
+                  className={'fg-tt-action-header'}
+                />
+                <SortHeader
+                  column="Symbol"
+                  active={sort.column === 'Symbol'}
+                  direction={sort.direction}
+                  align="left"
+                  onClick={handleSort}
+                  className={'fg-tt-symbol-header'}
+                />
+                <SortHeader
+                  column="Self"
+                  active={sort.column === 'Self'}
+                  direction={sort.direction}
+                  align="right"
+                  onClick={handleSort}
+                  className={'fg-tt-numeric-header'}
+                />
+                <SortHeader
+                  column="Total"
+                  active={sort.column === 'Total'}
+                  direction={sort.direction}
+                  align="right"
+                  onClick={handleSort}
+                  className={'fg-tt-numeric-header'}
+                />
+              </tr>
+            </thead>
+            <tbody>
+              {padTop > 0 && (
+                <tr aria-hidden="true" style={{ height: padTop }}>
+                  <td colSpan={4} />
+                </tr>
+              )}
+              {sortedRows.slice(startIdx, endIdx).map((row) => (
+                <TableRow
+                  key={row.symbol}
+                  data={data}
+                  row={row}
+                  search={search}
+                  sandwichItem={sandwichItem}
+                  onSymbolClick={onSymbolClick}
+                  onSearch={onSearch}
+                  onSandwich={onSandwich}
+                />
+              ))}
+              {padBottom > 0 && (
+                <tr aria-hidden="true" style={{ height: padBottom }}>
+                  <td colSpan={4} />
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     );
-  }
+  },
 );
 
 FlameGraphTopTableContainer.displayName = 'FlameGraphTopTableContainer';
 
-function buildFilteredTable(data: FlameGraphDataContainer, matchedLabels?: Set<string>) {
-  // Group the data by label, we show only one row per label and sum the values
-  // TODO: should be by filename + funcName + linenumber?
-  let filteredTable: { [key: string]: TableData } = Object.create(null);
+function SortHeaderInner({
+  column,
+  active,
+  direction,
+  align,
+  onClick,
+  className,
+}: {
+  column: SortColumn;
+  active: boolean;
+  direction: SortDirection;
+  align: 'left' | 'right';
+  onClick: (column: SortColumn) => void;
+  className: string;
+}) {
+  const label = `Sort by column ${column}${active ? (direction === 'desc' ? ', descending' : ', ascending') : ''}`;
+  const indicator = active ? (
+    <Icon name={direction === 'desc' ? 'angle-down' : 'angle-up'} size={12} />
+  ) : null;
+  return (
+    <th
+      className={className}
+      aria-sort={
+        active ? (direction === 'desc' ? 'descending' : 'ascending') : 'none'
+      }
+    >
+      <button
+        type="button"
+        className={'fg-tt-sort-btn'}
+        style={{
+          justifyContent: align === 'right' ? 'flex-end' : 'flex-start',
+        }}
+        onClick={() => onClick(column)}
+        aria-label={label}
+        title={label}
+      >
+        <span>{column}</span>
+        {indicator}
+      </button>
+    </th>
+  );
+}
+const SortHeader = memo(SortHeaderInner);
 
-  // Track call stack to detect recursive calls
+type TableRowProps = {
+  data: FlameGraphDataContainer;
+  row: Row;
+  search?: string;
+  sandwichItem?: string;
+  onSymbolClick: (symbol: string) => void;
+  onSearch: (symbol: string) => void;
+  onSandwich: (symbol?: string) => void;
+};
+
+function TableRowInner({
+  data,
+  row,
+  search,
+  sandwichItem,
+  onSymbolClick,
+  onSearch,
+  onSandwich,
+}: TableRowProps) {
+  const isSearched = search === `^${escapeRegex(row.symbol)}$`;
+  const isSandwiched = sandwichItem === row.symbol;
+
+  const selfDisp = data.valueDisplayProcessor(row.self);
+  const totalDisp = data.valueDisplayProcessor(row.total);
+
+  const onSandwichClick = useCallback(
+    () => onSandwich(isSandwiched ? undefined : row.symbol),
+    [onSandwich, isSandwiched, row.symbol],
+  );
+  const onSearchClick = useCallback(
+    () => onSearch(isSearched ? '' : row.symbol),
+    [onSearch, isSearched, row.symbol],
+  );
+  const onLinkClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      onSymbolClick(row.symbol);
+    },
+    [onSymbolClick, row.symbol],
+  );
+
+  return (
+    <tr role="row" className="fg-tt-row" style={{ height: ROW_HEIGHT }}>
+      <td className="fg-tt-action-cell">
+        {/* Visual order matches upstream @grafana/ui <Table>: sandwich first,
+            then search. Grafana's source JSX has them reversed but its
+            IconButton wrapper renders them this way visually. */}
+        <ActionButton
+          icon="sandwich"
+          active={isSandwiched}
+          label={
+            isSandwiched ? 'Remove from sandwich view' : 'Show in sandwich view'
+          }
+          onClick={onSandwichClick}
+        />
+        <ActionButton
+          icon="search"
+          active={isSearched}
+          label={isSearched ? 'Clear from search' : 'Search for symbol'}
+          onClick={onSearchClick}
+        />
+      </td>
+      <td className={'fg-tt-symbol-cell'}>
+        <a
+          href=""
+          role="link"
+          title="Highlight symbol"
+          aria-label={row.symbol}
+          className={'fg-tt-symbol-link'}
+          onClick={onLinkClick}
+        >
+          {row.symbol}
+        </a>
+      </td>
+      <td className={'fg-tt-numeric-cell'}>{formatValue(selfDisp)}</td>
+      <td className={'fg-tt-numeric-cell'}>{formatValue(totalDisp)}</td>
+    </tr>
+  );
+}
+const TableRow = memo(TableRowInner);
+
+function ActionButtonInner({
+  icon,
+  active,
+  label,
+  onClick,
+}: {
+  icon: IconType;
+  active: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={'fg-tt-action-btn'}
+      data-active={active}
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+    >
+      <Icon name={icon} size={14} />
+    </button>
+  );
+}
+const ActionButton = memo(ActionButtonInner);
+
+function formatValue(disp: { text: string; suffix?: string }) {
+  return disp.text + (disp.suffix ?? '');
+}
+
+export function buildFilteredTable(
+  data: FlameGraphDataContainer,
+  matchedLabels?: Set<string>,
+) {
+  // Group the data by label, we show only one row per label and sum the values
+  const filteredTable: { [key: string]: TableData } = Object.create(null);
+
+  // Track call stack to detect recursive calls — recursion would double-count
+  // a function's "total" if we summed every nested call, so we attribute total
+  // only at the outermost call.
   const callStack: string[] = [];
 
   for (let i = 0; i < data.data.length; i++) {
     const value = data.getValue(i);
-    const valueRight = data.getValueRight(i);
     const self = data.getSelf(i);
     const label = data.getLabel(i);
     const level = data.getLevel(i);
 
-    // Maintain call stack based on level changes
     while (callStack.length > level) {
       callStack.pop();
     }
 
-    // Check if this is a recursive call (same label already in call stack)
     const isRecursive = callStack.some((entry) => entry === label);
 
-    // If user is doing text search we filter out labels in the same way we highlight them in flame graph.
     if (!matchedLabels || matchedLabels.has(label)) {
       filteredTable[label] = filteredTable[label] || {};
-      filteredTable[label].self = filteredTable[label].self ? filteredTable[label].self + self : self;
+      filteredTable[label].self = filteredTable[label].self
+        ? filteredTable[label].self + self
+        : self;
 
-      // Only add to total if this is not a recursive call
       if (!isRecursive) {
-        filteredTable[label].total = filteredTable[label].total ? filteredTable[label].total + value : value;
-        filteredTable[label].totalRight = filteredTable[label].totalRight
-          ? filteredTable[label].totalRight + valueRight
-          : valueRight;
+        filteredTable[label].total = filteredTable[label].total
+          ? filteredTable[label].total + value
+          : value;
       }
     }
 
-    // Add current call to the stack
     callStack.push(label);
   }
 
   return filteredTable;
 }
-
-function buildTableDataFrame(
-  data: FlameGraphDataContainer,
-  table: { [key: string]: TableData },
-  width: number,
-  onSymbolClick: (str: string) => void,
-  onSearch: (str: string) => void,
-  onSandwich: (str?: string) => void,
-  theme: GrafanaTheme2,
-  colorScheme: ColorScheme | ColorSchemeDiff,
-  search?: string,
-  sandwichItem?: string
-): DataFrame {
-  const actionField: Field = createActionField(onSandwich, onSearch, search, sandwichItem);
-
-  const symbolField: Field = {
-    type: FieldType.string,
-    name: 'Symbol',
-    values: [],
-    config: {
-      custom: { width: width - actionColumnWidth - TOP_TABLE_COLUMN_WIDTH * 2 },
-      links: [
-        {
-          title: 'Highlight symbol',
-          url: '',
-          onClick: (e: DataLinkClickEvent) => {
-            const field: Field = e.origin.field;
-            const value = field.values[e.origin.rowIndex];
-            onSymbolClick(value);
-          },
-        },
-      ],
-    },
-  };
-
-  let frame;
-
-  if (data.isDiffFlamegraph()) {
-    symbolField.config.custom.width = width - actionColumnWidth - TOP_TABLE_COLUMN_WIDTH * 3;
-
-    const baselineField = createNumberField('Baseline', 'percent');
-    const comparisonField = createNumberField('Comparison', 'percent');
-    const diffField = createNumberField('Diff', 'percent');
-    diffField.config.custom.cellOptions.type = TableCellDisplayMode.ColorText;
-
-    const [removeColor, addColor] =
-      colorScheme === ColorSchemeDiff.DiffColorBlind
-        ? [diffColorBlindColors[0], diffColorBlindColors[2]]
-        : [diffDefaultColors[0], diffDefaultColors[2]];
-
-    diffField.config.mappings = [
-      { type: MappingType.ValueToText, options: { [Infinity]: { text: 'new', color: addColor } } },
-      { type: MappingType.ValueToText, options: { [-100]: { text: 'removed', color: removeColor } } },
-      { type: MappingType.RangeToText, options: { from: 0, to: Infinity, result: { color: addColor } } },
-      { type: MappingType.RangeToText, options: { from: -Infinity, to: 0, result: { color: removeColor } } },
-    ];
-
-    // For this we don't really consider sandwich view even though you can switch it on.
-    const levels = data.getLevels();
-    const totalTicks = levels.length ? levels[0][0].value : 0;
-    const totalTicksRight = levels.length ? levels[0][0].valueRight : undefined;
-
-    for (let key in table) {
-      actionField.values.push(null);
-      symbolField.values.push(key);
-
-      const ticksLeft = table[key].total;
-      const ticksRight = table[key].totalRight;
-
-      // We are iterating over table of the data so totalTicksRight needs to be defined
-      const totalTicksLeft = totalTicks - totalTicksRight!;
-
-      const percentageLeft = Math.round((10000 * ticksLeft) / totalTicksLeft) / 100;
-      const percentageRight = Math.round((10000 * ticksRight) / totalTicksRight!) / 100;
-
-      const diff = ((percentageRight - percentageLeft) / percentageLeft) * 100;
-
-      diffField.values.push(diff);
-      baselineField.values.push(percentageLeft);
-      comparisonField.values.push(percentageRight);
-    }
-
-    frame = {
-      fields: [actionField, symbolField, baselineField, comparisonField, diffField],
-      length: symbolField.values.length,
-    };
-  } else {
-    const selfField = createNumberField('Self', data.selfField.config.unit);
-    const totalField = createNumberField('Total', data.valueField.config.unit);
-
-    for (let key in table) {
-      actionField.values.push(null);
-      symbolField.values.push(key);
-      selfField.values.push(table[key].self);
-      totalField.values.push(table[key].total);
-    }
-
-    frame = { fields: [actionField, symbolField, selfField, totalField], length: symbolField.values.length };
-  }
-
-  const dataFrames = applyFieldOverrides({
-    data: [frame],
-    fieldConfig: {
-      defaults: {},
-      overrides: [],
-    },
-    replaceVariables: (value: string) => value,
-    theme,
-  });
-
-  return dataFrames[0];
-}
-
-function createNumberField(name: string, unit?: string): Field {
-  const tableFieldOptions: TableFieldOptions = {
-    width: TOP_TABLE_COLUMN_WIDTH,
-    align: 'auto',
-    inspect: false,
-    cellOptions: { type: TableCellDisplayMode.Auto },
-  };
-
-  return {
-    type: FieldType.number,
-    name,
-    values: [],
-    config: {
-      unit,
-      custom: tableFieldOptions,
-    },
-  };
-}
-
-const actionColumnWidth = 61;
-
-function createActionField(
-  onSandwich: (str?: string) => void,
-  onSearch: (str: string) => void,
-  search?: string,
-  sandwichItem?: string
-): Field {
-  const options: TableCustomCellOptions = {
-    type: TableCellDisplayMode.Custom,
-    cellComponent: (props) => {
-      return (
-        <ActionCell
-          frame={props.frame}
-          onSandwich={onSandwich}
-          onSearch={onSearch}
-          search={search}
-          sandwichItem={sandwichItem}
-          rowIndex={props.rowIndex}
-        />
-      );
-    },
-  };
-
-  const actionFieldTableConfig: TableFieldOptions = {
-    filterable: false,
-    width: actionColumnWidth,
-    hideHeader: true,
-    inspect: false,
-    align: 'auto',
-    cellOptions: options,
-  };
-
-  return {
-    type: FieldType.number,
-    name: 'actions',
-    values: [],
-    config: {
-      custom: actionFieldTableConfig,
-    },
-  };
-}
-
-type ActionCellProps = {
-  frame: DataFrame;
-  rowIndex: number;
-  search?: string;
-  sandwichItem?: string;
-  onSearch: (symbol: string) => void;
-  onSandwich: (symbol: string) => void;
-};
-
-function ActionCell(props: ActionCellProps) {
-  const styles = getStylesActionCell();
-  const symbol = props.frame.fields.find((f: Field) => f.name === 'Symbol')?.values[props.rowIndex];
-  const isSearched = props.search === `^${escapeStringForRegex(String(symbol))}$`;
-  const isSandwiched = props.sandwichItem === symbol;
-
-  return (
-    <div className={styles.actionCellWrapper}>
-      <IconButton
-        className={styles.actionCellButton}
-        name={'search'}
-        variant={isSearched ? 'primary' : 'secondary'}
-        tooltip={isSearched ? 'Clear from search' : 'Search for symbol'}
-        aria-label={isSearched ? 'Clear from search' : 'Search for symbol'}
-        onClick={() => {
-          props.onSearch(isSearched ? '' : symbol);
-        }}
-      />
-      <IconButton
-        className={styles.actionCellButton}
-        name={'gf-show-context'}
-        tooltip={isSandwiched ? 'Remove from sandwich view' : 'Show in sandwich view'}
-        variant={isSandwiched ? 'primary' : 'secondary'}
-        aria-label={isSandwiched ? 'Remove from sandwich view' : 'Show in sandwich view'}
-        onClick={() => {
-          props.onSandwich(isSandwiched ? undefined : symbol);
-        }}
-      />
-    </div>
-  );
-}
-
-const getStyles = (theme: GrafanaTheme2) => {
-  return {
-    topTableContainer: css({
-      label: 'topTableContainer',
-      padding: theme.spacing(1),
-      backgroundColor: theme.colors.background.secondary,
-      height: '100%',
-    }),
-  };
-};
-
-const getStylesActionCell = () => {
-  return {
-    actionCellWrapper: css({
-      label: 'actionCellWrapper',
-      display: 'flex',
-      height: '24px',
-    }),
-    actionCellButton: css({
-      label: 'actionCellButton',
-      marginRight: 0,
-      width: '24px',
-    }),
-  };
-};
-
-export { buildFilteredTable };
 
 export default FlameGraphTopTableContainer;

@@ -1,18 +1,18 @@
-import { css, cx } from '@emotion/css';
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import * as React from 'react';
-import { useDebounce, usePrevious } from 'react-use';
 
-import { type ChatContextItem, OpenAssistantButton } from '@grafana/assistant';
-import { type GrafanaTheme2, type SelectableValue } from '@grafana/data';
-import { Button, ButtonGroup, Dropdown, IconButton, Input, Menu, RadioButtonGroup, useStyles2 } from '@grafana/ui';
+import { Icon, type IconType } from '@components/core/Icon';
 
 import { ColorSchemeButton } from './ColorSchemeButton';
 import { type CollapsedMap } from './FlameGraph/dataTransform';
-import { MIN_WIDTH_TO_SHOW_BOTH_TOPTABLE_AND_FLAMEGRAPH, MIN_WIDTH_TO_SHOW_SPLIT_PANE_SELECTORS } from './constants';
-import { type ColorScheme, type ColorSchemeDiff, PaneView, SelectedView, type TextAlign, ViewMode } from './types';
+import { MIN_WIDTH_TO_SHOW_BOTH_TOPTABLE_AND_FLAMEGRAPH } from './constants';
+import { cx } from './cx';
+import { useDebounce, usePrevious } from './hooks';
+import { type ColorScheme, SelectedView, type TextAlign } from './types';
 
-type LegacyProps = {
+import './FlameGraphHeader.css';
+
+type Props = {
   search: string;
   setSearch: (search: string) => void;
   selectedView: SelectedView;
@@ -22,198 +22,22 @@ type LegacyProps = {
   textAlign: TextAlign;
   onTextAlignChange: (align: TextAlign) => void;
   showResetButton: boolean;
-  colorScheme: ColorScheme | ColorSchemeDiff;
-  onColorSchemeChange: (colorScheme: ColorScheme | ColorSchemeDiff) => void;
+  colorScheme: ColorScheme;
+  onColorSchemeChange: (colorScheme: ColorScheme) => void;
   stickyHeader: boolean;
   vertical?: boolean;
-  isDiffMode: boolean;
   setCollapsedMap: (collapsedMap: CollapsedMap) => void;
   collapsedMap: CollapsedMap;
 
   extraHeaderElements?: React.ReactNode;
-
-  assistantContext?: ChatContextItem[];
 };
-
-type NewUIProps = {
-  search: string;
-  setSearch: (search: string) => void;
-  enableNewUI: true;
-  viewMode: ViewMode;
-  setViewMode: (mode: ViewMode) => void;
-  canShowSplitView: boolean;
-  containerWidth: number;
-  leftPaneView: PaneView;
-  setLeftPaneView: (view: PaneView) => void;
-  rightPaneView: PaneView;
-  setRightPaneView: (view: PaneView) => void;
-  singleView: PaneView;
-  setSingleView: (view: PaneView) => void;
-  onSwapPanes: () => void;
-  onReset: () => void;
-  showResetButton: boolean;
-  stickyHeader: boolean;
-
-  extraHeaderElements?: React.ReactNode;
-
-  assistantContext?: ChatContextItem[];
-};
-
-type Props = LegacyProps | NewUIProps;
-
-function isNewUI(props: Props): props is NewUIProps {
-  return 'enableNewUI' in props && props.enableNewUI === true;
-}
 
 const FlameGraphHeader = (props: Props) => {
-  const styles = useStyles2(getStyles);
-  const [localSearch, setLocalSearch] = useSearchInput(props.search, props.setSearch);
+  const [localSearch, setLocalSearch] = useSearchInput(
+    props.search,
+    props.setSearch,
+  );
 
-  const suffix =
-    localSearch !== '' ? (
-      <Button
-        icon="times"
-        fill="text"
-        size="sm"
-        onClick={() => {
-          // We could set only one and wait them to sync but there is no need to debounce this.
-          props.setSearch('');
-          setLocalSearch('');
-        }}
-      >
-        Clear
-      </Button>
-    ) : null;
-
-  if (isNewUI(props)) {
-    const effectiveViewMode = props.canShowSplitView ? props.viewMode : ViewMode.Single;
-
-    return (
-      <div className={cx(styles.header, styles.headerNew, { [styles.stickyHeader]: props.stickyHeader })}>
-        <div className={styles.inputContainerNew}>
-          <Input
-            value={localSearch || ''}
-            onChange={(v) => {
-              setLocalSearch(v.currentTarget.value);
-            }}
-            placeholder={'Search...'}
-            suffix={suffix}
-          />
-        </div>
-
-        {effectiveViewMode === ViewMode.Split && (
-          <div className={styles.middleContainer}>
-            {props.containerWidth >= MIN_WIDTH_TO_SHOW_SPLIT_PANE_SELECTORS ? (
-              <>
-                <RadioButtonGroup<PaneView>
-                  size="sm"
-                  options={paneViewOptions}
-                  value={props.leftPaneView}
-                  onChange={props.setLeftPaneView}
-                  className={styles.buttonSpacing}
-                />
-                <IconButton name="exchange-alt" size="sm" tooltip="Swap views" onClick={props.onSwapPanes} />
-                <RadioButtonGroup<PaneView>
-                  size="sm"
-                  options={paneViewOptions}
-                  value={props.rightPaneView}
-                  onChange={props.setRightPaneView}
-                  className={styles.buttonSpacing}
-                />
-              </>
-            ) : (
-              <>
-                <Dropdown
-                  overlay={
-                    <Menu>
-                      {paneViewOptions.map((option) => (
-                        <Menu.Item
-                          key={option.value}
-                          label={option.label ?? ''}
-                          active={props.leftPaneView === option.value}
-                          onClick={() => option.value && props.setLeftPaneView(option.value)}
-                        />
-                      ))}
-                    </Menu>
-                  }
-                >
-                  <Button variant="secondary" size="sm" className={styles.paneDropdownButton}>
-                    {paneViewOptions.find((o) => o.value === props.leftPaneView)?.label}
-                  </Button>
-                </Dropdown>
-                <IconButton name="exchange-alt" size="sm" tooltip="Swap views" onClick={props.onSwapPanes} />
-                <Dropdown
-                  overlay={
-                    <Menu>
-                      {paneViewOptions.map((option) => (
-                        <Menu.Item
-                          key={option.value}
-                          label={option.label ?? ''}
-                          active={props.rightPaneView === option.value}
-                          onClick={() => option.value && props.setRightPaneView(option.value)}
-                        />
-                      ))}
-                    </Menu>
-                  }
-                >
-                  <Button variant="secondary" size="sm" className={styles.paneDropdownButton}>
-                    {paneViewOptions.find((o) => o.value === props.rightPaneView)?.label}
-                  </Button>
-                </Dropdown>
-              </>
-            )}
-          </div>
-        )}
-
-        <div className={styles.rightContainer}>
-          {!!props.assistantContext?.length && (
-            <div className={styles.buttonSpacing}>
-              <OpenAssistantButton
-                origin="grafana/flame-graph"
-                prompt="Analyze this flamegraph by querying the current datasource"
-                context={props.assistantContext}
-              />
-            </div>
-          )}
-          {props.showResetButton && (
-            <Button
-              variant={'secondary'}
-              fill={'outline'}
-              size={'sm'}
-              icon={'history-alt'}
-              tooltip={'Reset focus and sandwich state'}
-              onClick={() => {
-                props.onReset();
-              }}
-              className={styles.buttonSpacing}
-              aria-label={'Reset focus and sandwich state'}
-            />
-          )}
-          {effectiveViewMode === ViewMode.Single && (
-            <RadioButtonGroup<PaneView>
-              size="sm"
-              options={paneViewOptions}
-              value={props.singleView}
-              onChange={props.setSingleView}
-              className={styles.buttonSpacing}
-            />
-          )}
-          {props.canShowSplitView && (
-            <RadioButtonGroup<ViewMode>
-              size="sm"
-              options={viewModeOptions}
-              value={props.viewMode}
-              onChange={props.setViewMode}
-              className={styles.buttonSpacing}
-            />
-          )}
-          {props.extraHeaderElements && <div className={styles.extraElements}>{props.extraHeaderElements}</div>}
-        </div>
-      </div>
-    );
-  }
-
-  // Legacy UI rendering
   const {
     selectedView,
     setSelectedView,
@@ -227,132 +51,205 @@ const FlameGraphHeader = (props: Props) => {
     stickyHeader,
     extraHeaderElements,
     vertical,
-    isDiffMode,
     setCollapsedMap,
     collapsedMap,
-    assistantContext,
   } = props;
 
+  const tableOnly = selectedView === SelectedView.TopTable;
+  const viewOptions = getViewOptions(containerWidth, vertical);
+
   return (
-    <div className={cx(styles.header, { [styles.stickyHeader]: stickyHeader })}>
-      <div className={styles.inputContainer}>
-        <Input
-          value={localSearch || ''}
-          onChange={(v) => {
-            setLocalSearch(v.currentTarget.value);
-          }}
-          placeholder={'Search...'}
-          suffix={suffix}
-        />
+    <div className={cx('fg-header', { 'fg-header-sticky': stickyHeader })}>
+      <div className="fg-header-input-container">
+        <div className="fg-header-search-wrapper">
+          <input
+            type="text"
+            className="fg-header-search-input"
+            value={localSearch || ''}
+            onChange={(e) => setLocalSearch(e.currentTarget.value)}
+            placeholder="Search..."
+          />
+          {localSearch !== '' ? (
+            <button
+              type="button"
+              className="fg-header-clear-button"
+              onClick={() => {
+                props.setSearch('');
+                setLocalSearch('');
+              }}
+              aria-label="Clear"
+            >
+              <Icon name="times" size={12} />
+              <span>Clear</span>
+            </button>
+          ) : null}
+        </div>
       </div>
 
-      <div className={styles.rightContainer}>
-        {!!assistantContext?.length && (
-          <div className={styles.buttonSpacing}>
-            <OpenAssistantButton
-              origin="grafana/flame-graph"
-              prompt="Analyze this flamegraph by querying the current datasource"
-              context={assistantContext}
-            />
-          </div>
-        )}
+      <div className="fg-header-right">
         {showResetButton && (
-          <Button
-            variant={'secondary'}
-            fill={'outline'}
-            size={'sm'}
-            icon={'history-alt'}
-            tooltip={'Reset focus and sandwich state'}
-            onClick={() => {
-              onReset();
-            }}
-            className={styles.buttonSpacing}
-            aria-label={'Reset focus and sandwich state'}
+          <IconBtn
+            icon="history-alt"
+            label="Reset focus and sandwich state"
+            onClick={onReset}
           />
         )}
-        <ColorSchemeButton value={colorScheme} onChange={onColorSchemeChange} isDiffMode={isDiffMode} />
-        <ButtonGroup className={styles.buttonSpacing}>
-          <Button
-            variant={'secondary'}
-            fill={'outline'}
-            size={'sm'}
-            tooltip={'Expand all groups'}
-            onClick={() => {
-              setCollapsedMap(collapsedMap.setAllCollapsedStatus(false));
-            }}
-            aria-label={'Expand all groups'}
-            icon={'angle-double-down'}
-            disabled={selectedView === SelectedView.TopTable}
+        <ColorSchemeButton value={colorScheme} onChange={onColorSchemeChange} />
+        <div className={cx('fg-header-btn-group', 'fg-header-spacing-right')}>
+          <IconBtn
+            icon="angle-double-down"
+            label="Expand all groups"
+            disabled={tableOnly}
+            onClick={() =>
+              setCollapsedMap(collapsedMap.setAllCollapsedStatus(false))
+            }
+            grouped
           />
-          <Button
-            variant={'secondary'}
-            fill={'outline'}
-            size={'sm'}
-            tooltip={'Collapse all groups'}
-            onClick={() => {
-              setCollapsedMap(collapsedMap.setAllCollapsedStatus(true));
-            }}
-            aria-label={'Collapse all groups'}
-            icon={'angle-double-up'}
-            disabled={selectedView === SelectedView.TopTable}
+          <IconBtn
+            icon="angle-double-up"
+            label="Collapse all groups"
+            disabled={tableOnly}
+            onClick={() =>
+              setCollapsedMap(collapsedMap.setAllCollapsedStatus(true))
+            }
+            grouped
           />
-        </ButtonGroup>
-        <RadioButtonGroup<TextAlign>
-          size="sm"
-          disabled={selectedView === SelectedView.TopTable}
-          options={alignOptions}
+        </div>
+        <RadioGroup
+          name="text-align"
           value={textAlign}
           onChange={onTextAlignChange}
-          className={styles.buttonSpacing}
+          disabled={tableOnly}
+          className="fg-header-spacing-right"
+          options={[
+            { value: 'left', title: 'Align text left', icon: 'align-left' },
+            { value: 'right', title: 'Align text right', icon: 'align-right' },
+          ]}
         />
-        <RadioButtonGroup<SelectedView>
-          size="sm"
-          options={getViewOptions(containerWidth, vertical)}
+        <RadioGroup
+          name="selected-view"
           value={selectedView}
           onChange={setSelectedView}
+          options={viewOptions.map((o) => ({
+            value: o.value,
+            title: o.label,
+            label: o.label,
+          }))}
         />
-        {extraHeaderElements && <div className={styles.extraElements}>{extraHeaderElements}</div>}
+        {extraHeaderElements && (
+          <div className="fg-header-extra-elements">{extraHeaderElements}</div>
+        )}
       </div>
     </div>
   );
 };
 
-export const alignOptions: Array<SelectableValue<TextAlign>> = [
-  { value: 'left', description: 'Align text left', icon: 'align-left' },
-  { value: 'right', description: 'Align text right', icon: 'align-right' },
-];
+function IconBtn({
+  icon,
+  label,
+  onClick,
+  disabled,
+  grouped,
+}: {
+  icon: IconType;
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  grouped?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      className={cx(
+        'fg-header-icon-btn',
+        grouped && 'fg-header-icon-btn-grouped',
+        !grouped && 'fg-header-spacing-right',
+      )}
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      title={label}
+    >
+      <Icon name={icon} size={14} />
+    </button>
+  );
+}
 
-const viewModeOptions: Array<SelectableValue<ViewMode>> = [
-  { value: ViewMode.Single, label: 'Single', description: 'Single view' },
-  { value: ViewMode.Split, label: 'Split', description: 'Split view' },
-];
+type RadioOption<T extends string> = {
+  value: T;
+  title: string;
+  label?: string;
+  icon?: IconType;
+};
 
-const paneViewOptions: Array<SelectableValue<PaneView>> = [
-  { value: PaneView.TopTable, label: 'Top Table' },
-  { value: PaneView.FlameGraph, label: 'Flame Graph' },
-  { value: PaneView.CallTree, label: 'Call Tree' },
-];
+function RadioGroup<T extends string>({
+  name,
+  value,
+  onChange,
+  options,
+  disabled,
+  className,
+}: {
+  name: string;
+  value: T;
+  onChange: (v: T) => void;
+  options: RadioOption<T>[];
+  disabled?: boolean;
+  className?: string;
+}) {
+  const groupId = useId();
+  return (
+    <div className={cx('fg-header-radio-group', className)} role="radiogroup">
+      {options.map((opt) => {
+        const id = `${groupId}-${opt.value}`;
+        const checked = value === opt.value;
+        return (
+          <span key={opt.value} className="fg-header-radio-cell">
+            {/* Input must remain a preceding sibling of the label — e2e
+                tests use `label/preceding-sibling::input` XPath to find it. */}
+            <input
+              type="radio"
+              id={id}
+              name={`${name}-${groupId}`}
+              checked={checked}
+              disabled={disabled}
+              onChange={() => onChange(opt.value)}
+              className="fg-header-radio-input"
+              aria-label={opt.title}
+            />
+            <label
+              htmlFor={id}
+              title={opt.title}
+              className="fg-header-radio-label"
+              data-checked={checked}
+            >
+              {opt.icon && <Icon name={opt.icon} size={14} />}
+              {opt.label && <span>{opt.label}</span>}
+            </label>
+          </span>
+        );
+      })}
+    </div>
+  );
+}
 
-function getViewOptions(width: number, vertical?: boolean): Array<SelectableValue<SelectedView>> {
-  let viewOptions: Array<{ value: SelectedView; label: string; description: string }> = [
-    { value: SelectedView.TopTable, label: 'Top Table', description: 'Only show top table' },
-    { value: SelectedView.FlameGraph, label: 'Flame Graph', description: 'Only show flame graph' },
+function getViewOptions(
+  width: number,
+  vertical?: boolean,
+): Array<{ value: SelectedView; label: string }> {
+  const options: Array<{ value: SelectedView; label: string }> = [
+    { value: SelectedView.TopTable, label: 'Top Table' },
+    { value: SelectedView.FlameGraph, label: 'Flame Graph' },
   ];
-
   if (width >= MIN_WIDTH_TO_SHOW_BOTH_TOPTABLE_AND_FLAMEGRAPH || vertical) {
-    viewOptions.push({
-      value: SelectedView.Both,
-      label: 'Both',
-      description: 'Show both the top table and flame graph',
-    });
+    options.push({ value: SelectedView.Both, label: 'Both' });
   }
-
-  return viewOptions;
+  return options;
 }
 
 function useSearchInput(
   search: string,
-  setSearch: (search: string) => void
+  setSearch: (search: string) => void,
 ): [string | undefined, (search: string) => void] {
   const [localSearchState, setLocalSearchState] = useState(search);
   const prevSearch = usePrevious(search);
@@ -363,7 +260,7 @@ function useSearchInput(
       setSearch(localSearchState);
     },
     250,
-    [localSearchState]
+    [localSearchState],
   );
 
   // Make sure we still handle updates from parent (from clicking on a table item for example). We check if the parent
@@ -376,79 +273,5 @@ function useSearchInput(
 
   return [localSearchState, setLocalSearchState];
 }
-
-const getStyles = (theme: GrafanaTheme2) => ({
-  header: css({
-    label: 'header',
-    display: 'flex',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    width: '100%',
-    top: 0,
-    gap: theme.spacing(1),
-    marginTop: theme.spacing(1),
-  }),
-  headerNew: css({
-    label: 'headerNew',
-    alignItems: 'flex-start',
-    position: 'relative',
-  }),
-  stickyHeader: css({
-    zIndex: theme.zIndex.navbarFixed,
-    position: 'sticky',
-    background: theme.colors.background.primary,
-  }),
-  inputContainer: css({
-    label: 'inputContainer',
-    flexGrow: 1,
-    minWidth: '150px',
-    maxWidth: '350px',
-  }),
-  inputContainerNew: css({
-    label: 'inputContainerNew',
-    flexGrow: 0,
-    minWidth: '150px',
-    maxWidth: '350px',
-  }),
-  middleContainer: css({
-    label: 'middleContainer',
-    display: 'flex',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: theme.spacing(1),
-    position: 'absolute',
-    left: '50%',
-    transform: 'translateX(-50%)',
-  }),
-  rightContainer: css({
-    label: 'rightContainer',
-    display: 'flex',
-    alignItems: 'flex-start',
-    flexWrap: 'wrap',
-  }),
-  buttonSpacing: css({
-    label: 'buttonSpacing',
-    marginRight: theme.spacing(1),
-  }),
-  resetButton: css({
-    label: 'resetButton',
-    display: 'flex',
-    marginRight: theme.spacing(2),
-  }),
-  resetButtonIconWrapper: css({
-    label: 'resetButtonIcon',
-    padding: '0 5px',
-    color: theme.colors.text.disabled,
-  }),
-  extraElements: css({
-    label: 'extraElements',
-    marginLeft: theme.spacing(1),
-  }),
-  paneDropdownButton: css({
-    label: 'paneDropdownButton',
-    minWidth: '95px',
-    justifyContent: 'center',
-  }),
-});
 
 export default FlameGraphHeader;

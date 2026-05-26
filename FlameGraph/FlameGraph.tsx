@@ -16,29 +16,29 @@
 // OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
 // TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
 // THIS SOFTWARE.
-import { css, cx } from '@emotion/css';
 import { useEffect, useState } from 'react';
 
-import { type GrafanaTheme2 } from '@grafana/data';
-import { Button, ButtonGroup, Icon, RadioButtonGroup, useStyles2 } from '@grafana/ui';
+import { Icon } from '@components/core/Icon';
 
-import { ColorSchemeButton } from '../ColorSchemeButton';
-import { alignOptions } from '../FlameGraphHeader';
 import { PIXELS_PER_LEVEL } from '../constants';
+import { cx } from '../cx';
 import {
   type ClickedItemData,
   type ColorScheme,
-  type ColorSchemeDiff,
-  type PaneView,
   type SelectedView,
-  type ViewMode,
   type TextAlign,
 } from '../types';
 
 import FlameGraphCanvas from './FlameGraphCanvas';
 import { type GetExtraContextMenuButtonsFunction } from './FlameGraphContextMenu';
 import FlameGraphMetadata from './FlameGraphMetadata';
-import { type CollapsedMap, type FlameGraphDataContainer, type LevelItem } from './dataTransform';
+import {
+  type CollapsedMap,
+  type FlameGraphDataContainer,
+  type LevelItem,
+} from './dataTransform';
+
+import './FlameGraph.css';
 
 type Props = {
   data: FlameGraphDataContainer;
@@ -54,24 +54,14 @@ type Props = {
   onSandwich: (label: string) => void;
   onFocusPillClick: () => void;
   onSandwichPillClick: () => void;
-  colorScheme: ColorScheme | ColorSchemeDiff;
+  colorScheme: ColorScheme;
   showFlameGraphOnly?: boolean;
   getExtraContextMenuButtons?: GetExtraContextMenuButtonsFunction;
   collapsing?: boolean;
   search: string;
   collapsedMap: CollapsedMap;
   setCollapsedMap: (collapsedMap: CollapsedMap) => void;
-
-  // Legacy props
   selectedView?: SelectedView;
-
-  // New UI props (when enableNewUI is true, renders toolbar with controls)
-  enableNewUI?: boolean;
-  viewMode?: ViewMode;
-  paneView?: PaneView;
-  onTextAlignChange?: (align: TextAlign) => void;
-  onColorSchemeChange?: (colorScheme: ColorScheme | ColorSchemeDiff) => void;
-  isDiffMode?: boolean;
 };
 
 const FlameGraph = ({
@@ -96,42 +86,29 @@ const FlameGraph = ({
   collapsedMap,
   setCollapsedMap,
   selectedView,
-  enableNewUI,
-  viewMode,
-  paneView,
-  onTextAlignChange,
-  onColorSchemeChange,
-  isDiffMode,
 }: Props) => {
-  const isNewUI = enableNewUI === true;
-  const newStyles = useStyles2(getStylesNew);
-  const legacyStyles = getStylesLegacy();
+  // PIXELS_PER_LEVEL depends on devicePixelRatio so it's computed at runtime
+  // rather than baked into the .css file. Used to space sandwich canvases.
+  const sandwichMargin = `${PIXELS_PER_LEVEL / window.devicePixelRatio}px`;
 
   const [levels, setLevels] = useState<LevelItem[][]>();
   const [levelsCallers, setLevelsCallers] = useState<LevelItem[][]>();
-  const [totalProfileTicks, setTotalProfileTicks] = useState<number>(0);
-  const [totalProfileTicksRight, setTotalProfileTicksRight] = useState<number>();
   const [totalViewTicks, setTotalViewTicks] = useState<number>(0);
 
   useEffect(() => {
     if (data) {
       let levels = data.getLevels();
-      let totalProfileTicks = levels.length ? levels[0][0].value : 0;
-      let totalProfileTicksRight = levels.length ? levels[0][0].valueRight : undefined;
-      let totalViewTicks = totalProfileTicks;
+      let totalViewTicks = levels.length ? levels[0][0].value : 0;
       let levelsCallers = undefined;
 
       if (sandwichItem) {
         const [callers, callees] = data.getSandwichLevels(sandwichItem);
         levels = callees;
         levelsCallers = callers;
-        // We need this separate as in case of diff profile we want to compute diff colors based on the original ticks.
         totalViewTicks = callees[0]?.[0]?.value ?? 0;
       }
       setLevels(levels);
       setLevelsCallers(levelsCallers);
-      setTotalProfileTicks(totalProfileTicks);
-      setTotalProfileTicksRight(totalProfileTicksRight);
       setTotalViewTicks(totalViewTicks);
     }
   }, [data, sandwichItem]);
@@ -152,8 +129,6 @@ const FlameGraph = ({
     textAlign,
     onSandwich,
     colorScheme,
-    totalProfileTicks,
-    totalProfileTicksRight,
     totalViewTicks,
     showFlameGraphOnly,
     collapsedMap,
@@ -162,21 +137,19 @@ const FlameGraph = ({
     collapsing,
     search,
     selectedView,
-    viewMode,
-    paneView,
   };
   let canvas = null;
-
-  // Both style objects share sandwich/canvas styles, pick the right one based on mode.
-  const canvasStyles = isNewUI ? newStyles : legacyStyles;
 
   if (levelsCallers?.length) {
     canvas = (
       <>
-        <div className={canvasStyles.sandwichCanvasWrapper}>
-          <div className={canvasStyles.sandwichMarker}>
+        <div
+          className="fg-sandwich-canvas-wrapper"
+          style={{ marginBottom: sandwichMargin }}
+        >
+          <div className="fg-sandwich-marker">
             Callers
-            <Icon className={canvasStyles.sandwichMarkerIcon} name={'arrow-down'} />
+            <Icon className="fg-sandwich-marker-icon" name="angle-down" />
           </div>
           <FlameGraphCanvas
             {...commonCanvasProps}
@@ -188,9 +161,14 @@ const FlameGraph = ({
           />
         </div>
 
-        <div className={canvasStyles.sandwichCanvasWrapper}>
-          <div className={cx(canvasStyles.sandwichMarker, canvasStyles.sandwichMarkerCalees)}>
-            <Icon className={canvasStyles.sandwichMarkerIcon} name={'arrow-up'} />
+        <div
+          className="fg-sandwich-canvas-wrapper"
+          style={{ marginBottom: sandwichMargin }}
+        >
+          <div
+            className={cx('fg-sandwich-marker', 'fg-sandwich-marker-callees')}
+          >
+            <Icon className="fg-sandwich-marker-icon" name="angle-up" />
             Callees
           </div>
           <FlameGraphCanvas
@@ -205,67 +183,17 @@ const FlameGraph = ({
     );
   } else if (levels?.length) {
     canvas = (
-      <FlameGraphCanvas {...commonCanvasProps} root={levels[0][0]} depth={levels.length} direction={'children'} />
-    );
-  }
-
-  if (isNewUI) {
-    return (
-      <div className={newStyles.graph}>
-        <div className={newStyles.toolbar}>
-          <FlameGraphMetadata
-            data={data}
-            focusedItem={focusedItemData}
-            sandwichedLabel={sandwichItem}
-            totalTicks={totalViewTicks}
-            onFocusPillClick={onFocusPillClick}
-            onSandwichPillClick={onSandwichPillClick}
-          />
-          <div className={newStyles.controls}>
-            {onColorSchemeChange && (
-              <ColorSchemeButton value={colorScheme} onChange={onColorSchemeChange} isDiffMode={isDiffMode ?? false} />
-            )}
-            <ButtonGroup className={newStyles.buttonSpacing}>
-              <Button
-                variant={'secondary'}
-                fill={'outline'}
-                size={'sm'}
-                tooltip={'Expand all groups'}
-                onClick={() => {
-                  setCollapsedMap(collapsedMap.setAllCollapsedStatus(false));
-                }}
-                aria-label={'Expand all groups'}
-                icon={'angle-double-down'}
-              />
-              <Button
-                variant={'secondary'}
-                fill={'outline'}
-                size={'sm'}
-                tooltip={'Collapse all groups'}
-                onClick={() => {
-                  setCollapsedMap(collapsedMap.setAllCollapsedStatus(true));
-                }}
-                aria-label={'Collapse all groups'}
-                icon={'angle-double-up'}
-              />
-            </ButtonGroup>
-            {onTextAlignChange && (
-              <RadioButtonGroup<TextAlign>
-                size="sm"
-                options={alignOptions}
-                value={textAlign}
-                onChange={onTextAlignChange}
-              />
-            )}
-          </div>
-        </div>
-        {canvas}
-      </div>
+      <FlameGraphCanvas
+        {...commonCanvasProps}
+        root={levels[0][0]}
+        depth={levels.length}
+        direction={'children'}
+      />
     );
   }
 
   return (
-    <div className={legacyStyles.graph}>
+    <div className="fg-graph">
       <FlameGraphMetadata
         data={data}
         focusedItem={focusedItemData}
@@ -278,79 +206,5 @@ const FlameGraph = ({
     </div>
   );
 };
-
-const getStylesLegacy = () => ({
-  graph: css({
-    label: 'graph',
-    overflow: 'auto',
-    flexGrow: 1,
-    flexBasis: '50%',
-  }),
-  sandwichCanvasWrapper: css({
-    label: 'sandwichCanvasWrapper',
-    display: 'flex',
-    marginBottom: `${PIXELS_PER_LEVEL / window.devicePixelRatio}px`,
-  }),
-  sandwichMarker: css({
-    label: 'sandwichMarker',
-    writingMode: 'vertical-lr',
-    transform: 'rotate(180deg)',
-    overflow: 'hidden',
-    whiteSpace: 'nowrap',
-  }),
-  sandwichMarkerCalees: css({
-    label: 'sandwichMarkerCalees',
-    textAlign: 'right',
-  }),
-  sandwichMarkerIcon: css({
-    label: 'sandwichMarkerIcon',
-    verticalAlign: 'baseline',
-  }),
-});
-
-const getStylesNew = (theme: GrafanaTheme2) => ({
-  graph: css({
-    label: 'graph',
-    overflow: 'auto',
-    flexGrow: 1,
-    flexBasis: '50%',
-  }),
-  toolbar: css({
-    label: 'toolbar',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  }),
-  controls: css({
-    label: 'controls',
-    display: 'flex',
-    alignItems: 'center',
-    gap: theme.spacing(1),
-  }),
-  buttonSpacing: css({
-    label: 'buttonSpacing',
-    marginRight: theme.spacing(1),
-  }),
-  sandwichCanvasWrapper: css({
-    label: 'sandwichCanvasWrapper',
-    display: 'flex',
-    marginBottom: `${PIXELS_PER_LEVEL / window.devicePixelRatio}px`,
-  }),
-  sandwichMarker: css({
-    label: 'sandwichMarker',
-    writingMode: 'vertical-lr',
-    transform: 'rotate(180deg)',
-    overflow: 'hidden',
-    whiteSpace: 'nowrap',
-  }),
-  sandwichMarkerCalees: css({
-    label: 'sandwichMarkerCalees',
-    textAlign: 'right',
-  }),
-  sandwichMarkerIcon: css({
-    label: 'sandwichMarkerIcon',
-    verticalAlign: 'baseline',
-  }),
-});
 
 export default FlameGraph;

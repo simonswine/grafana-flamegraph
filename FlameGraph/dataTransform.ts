@@ -1,26 +1,43 @@
-import {
-  createTheme,
-  type DataFrame,
-  type DisplayProcessor,
-  type Field,
-  FieldType,
-  getDisplayProcessor,
-  type GrafanaTheme2,
-} from '@grafana/data';
-
+import { formatByUnit, type Formatted } from '../format';
 import { SampleUnit } from '../types';
 
 import { mergeParentSubtrees, mergeSubtrees } from './treeTransforms';
+
+// Minimal local mirrors of @grafana/data's DataFrame shape. The lib only
+// needs to read named fields by index and inspect their config.unit.
+export const FieldType = {
+  string: 'string',
+  number: 'number',
+  enum: 'enum',
+} as const;
+export type FieldType = (typeof FieldType)[keyof typeof FieldType];
+
+export type Field = {
+  name: string;
+  type: FieldType;
+  // Values are accessed by index; we don't constrain element type beyond
+  // the field's declared `type` since we read them through display
+  // processors that coerce as needed.
+  values: ReadonlyArray<string | number>;
+  config: {
+    unit?: string;
+    type?: { enum?: { text?: string[] } };
+  };
+};
+
+export type DataFrame = {
+  fields: Field[];
+  length: number;
+};
+
+export type DisplayProcessor = (value: unknown) => Formatted;
 
 export type LevelItem = {
   // Offset from the start of the level.
   start: number;
   // Value here can be different from a value of items in the data frame as for callers tree in sandwich view we have
   // to trim the value to correspond only to the part used by the children in the subtree.
-  // In case of diff profile this is actually left + right value.
   value: number;
-  // Only exists for diff profiles.
-  valueRight?: number;
   // Index into the data frame. It is an array because for sandwich views we may be merging multiple items into single
   // node.
   itemIndexes: number[];
@@ -40,7 +57,7 @@ export type CollapseConfig = {
  */
 export function nestedSetToLevels(
   container: FlameGraphDataContainer,
-  options?: Options
+  options?: Options,
 ): [LevelItem[][], Record<string, LevelItem[]>, CollapsedMap] {
   const levels: LevelItem[][] = [];
   let offset = 0;
@@ -59,9 +76,7 @@ export function nestedSetToLevels(
       // So we have to compute the correct offset based on the last sibling.
       const lastSibling = levels[currentLevel][levels[currentLevel].length - 1];
       offset =
-        lastSibling.start +
-        container.getValue(lastSibling.itemIndexes[0]) +
-        container.getValueRight(lastSibling.itemIndexes[0]);
+        lastSibling.start + container.getValue(lastSibling.itemIndexes[0]);
       // we assume there is always a single root node so lastSibling should always have a parent.
       // Also it has to have the same parent because of how the items are ordered.
       parent = lastSibling.parents![0];
@@ -69,8 +84,7 @@ export function nestedSetToLevels(
 
     const newItem: LevelItem = {
       itemIndexes: [i],
-      value: container.getValue(i) + container.getValueRight(i),
-      valueRight: container.isDiffFlamegraph() ? container.getValueRight(i) : undefined,
+      value: container.getValue(i),
       start: offset,
       parents: parent && [parent],
       children: [],
@@ -91,7 +105,9 @@ export function nestedSetToLevels(
     levels[currentLevel].push(newItem);
   }
 
-  const collapsedMapContainer = new CollapsedMapBuilder(options?.collapsingThreshold);
+  const collapsedMapContainer = new CollapsedMapBuilder(
+    options?.collapsingThreshold,
+  );
   if (options?.collapsing) {
     // We collapse similar items here, where it seems like parent and child are the same thing and so the distinction
     // isn't that important. We create a map of items that should be collapsed together. We need to do it with complete
@@ -187,7 +203,11 @@ export class CollapsedMapBuilder {
   // We assume items with small self just aren't too important while we cannot really collapse items with siblings
   // as it's not clear what to do with said sibling.
   addItem(item: LevelItem, parent?: LevelItem) {
-    if (parent && item.value > parent.value * this.threshold && parent.children.length === 1) {
+    if (
+      parent &&
+      item.value > parent.value * this.threshold &&
+      parent.children.length === 1
+    ) {
       if (this.map.has(parent)) {
         const config = this.map.get(parent)!;
         this.map.set(item, config);
@@ -212,7 +232,10 @@ export function getMessageCheckFieldsResult(wrongFields: CheckFieldsResult) {
 
   if (wrongFields.wrongTypeFields.length) {
     return `Data has fields of wrong type: ${wrongFields.wrongTypeFields
-      .map((f) => `${f.name} has type ${f.type} but should be ${f.expectedTypes.join(' or ')}`)
+      .map(
+        (f) =>
+          `${f.name} has type ${f.type} but should be ${f.expectedTypes.join(' or ')}`,
+      )
       .join(', ')}`;
   }
 
@@ -220,7 +243,11 @@ export function getMessageCheckFieldsResult(wrongFields: CheckFieldsResult) {
 }
 
 export type CheckFieldsResult = {
-  wrongTypeFields: Array<{ name: string; expectedTypes: FieldType[]; type: FieldType }>;
+  wrongTypeFields: Array<{
+    name: string;
+    expectedTypes: FieldType[];
+    type: FieldType;
+  }>;
   missingFields: string[];
 };
 
@@ -243,7 +270,11 @@ export function checkFields(data: DataFrame): CheckFieldsResult | undefined {
       continue;
     }
     if (!types.includes(frameField.type)) {
-      wrongTypeFields.push({ name, expectedTypes: types, type: frameField.type });
+      wrongTypeFields.push({
+        name,
+        expectedTypes: types,
+        type: frameField.type,
+      });
     }
   }
 
@@ -270,10 +301,6 @@ export class FlameGraphDataContainer {
   valueField: Field;
   selfField: Field;
 
-  // Optional fields for diff view
-  valueRightField?: Field;
-  selfRightField?: Field;
-
   labelDisplayProcessor: DisplayProcessor;
   valueDisplayProcessor: DisplayProcessor;
   uniqueLabels: string[];
@@ -282,7 +309,7 @@ export class FlameGraphDataContainer {
   private uniqueLabelsMap: Record<string, LevelItem[]> | undefined;
   private collapsedMap: CollapsedMap | undefined;
 
-  constructor(data: DataFrame, options: Options, theme: GrafanaTheme2 = createTheme()) {
+  constructor(data: DataFrame, options: Options) {
     this.data = data;
     this.options = options;
 
@@ -296,62 +323,50 @@ export class FlameGraphDataContainer {
     this.valueField = data.fields.find((f) => f.name === 'value')!;
     this.selfField = data.fields.find((f) => f.name === 'self')!;
 
-    this.valueRightField = data.fields.find((f) => f.name === 'valueRight')!;
-    this.selfRightField = data.fields.find((f) => f.name === 'selfRight')!;
-
-    if ((this.valueField || this.selfField) && !(this.valueField && this.selfField)) {
-      throw new Error(
-        'Malformed dataFrame: both valueRight and selfRight has to be present if one of them is present.'
-      );
-    }
-
     const enumConfig = this.labelField?.config?.type?.enum;
-    // Label can actually be an enum field so depending on that we have to access it through display processor. This is
-    // both a backward compatibility but also to allow using a simple dataFrame without enum config. This would allow
-    // users to use this panel with correct query from data sources that do not return profiles natively.
+    // Labels can come as enum-encoded indexes (DataFrame enum field, where
+    // values[i] is an index into config.type.enum.text). We resolve through
+    // the lookup table; otherwise treat values as plain strings.
     if (enumConfig) {
-      this.labelDisplayProcessor = getDisplayProcessor({ field: this.labelField, theme });
-      this.uniqueLabels = enumConfig.text || [];
-    } else {
+      const lookup = enumConfig.text || [];
       this.labelDisplayProcessor = (value) => ({
-        text: value + '',
+        text:
+          typeof value === 'number'
+            ? (lookup[value] ?? String(value))
+            : String(value),
+        suffix: '',
         numeric: 0,
       });
-      this.uniqueLabels = [...new Set<string>(this.labelField.values)];
+      this.uniqueLabels = lookup;
+    } else {
+      this.labelDisplayProcessor = (value) => ({
+        text: String(value),
+        suffix: '',
+        numeric: 0,
+      });
+      this.uniqueLabels = [
+        ...new Set<string>(this.labelField.values as string[]),
+      ];
     }
 
-    this.valueDisplayProcessor = getDisplayProcessor({
-      field: this.valueField,
-      theme,
-    });
-  }
-
-  isDiffFlamegraph() {
-    return Boolean(this.valueRightField && this.selfRightField);
+    const unit = this.valueField.config.unit;
+    this.valueDisplayProcessor = (value) => formatByUnit(Number(value), unit);
   }
 
   getLabel(index: number) {
     return this.labelDisplayProcessor(this.labelField.values[index]).text;
   }
 
-  getLevel(index: number) {
-    return this.levelField.values[index];
+  getLevel(index: number): number {
+    return Number(this.levelField.values[index]);
   }
 
   getValue(index: number | number[]) {
     return fieldAccessor(this.valueField, index);
   }
 
-  getValueRight(index: number | number[]) {
-    return fieldAccessor(this.valueRightField, index);
-  }
-
   getSelf(index: number | number[]) {
     return fieldAccessor(this.selfField, index);
-  }
-
-  getSelfRight(index: number | number[]) {
-    return fieldAccessor(this.selfRightField, index);
   }
 
   getSelfDisplay(index: number | number[]) {
@@ -403,7 +418,10 @@ export class FlameGraphDataContainer {
 
   private initLevels() {
     if (!this.levels) {
-      const [levels, uniqueLabelsMap, collapsedMap] = nestedSetToLevels(this, this.options);
+      const [levels, uniqueLabelsMap, collapsedMap] = nestedSetToLevels(
+        this,
+        this.options,
+      );
       this.levels = levels;
       this.uniqueLabelsMap = uniqueLabelsMap;
       this.collapsedMap = collapsedMap;
@@ -413,12 +431,16 @@ export class FlameGraphDataContainer {
 
 // Access field value with either single index or array of indexes. This is needed as we sometimes merge multiple
 // into one, and we want to access aggregated values.
-function fieldAccessor(field: Field | undefined, index: number | number[]) {
+function fieldAccessor(
+  field: Field | undefined,
+  index: number | number[],
+): number {
   if (!field) {
     return 0;
   }
-  let indexArray: number[] = typeof index === 'number' ? [index] : index;
-  return indexArray.reduce((acc, index) => {
-    return acc + field.values[index];
-  }, 0);
+  const indexArray: number[] = typeof index === 'number' ? [index] : index;
+  return indexArray.reduce<number>(
+    (acc, i) => acc + Number(field.values[i]),
+    0,
+  );
 }

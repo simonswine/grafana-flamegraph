@@ -11,44 +11,31 @@ export type ClickedItemData = {
   item: LevelItem;
 };
 
-export enum SampleUnit {
-  Bytes = 'bytes',
-  Short = 'short',
-  Nanoseconds = 'ns',
-}
+// Original sources used TS enums; switched to const objects + union types so
+// the file remains erasable-only (project tsconfig has erasableSyntaxOnly).
+export const SampleUnit = {
+  Bytes: 'bytes',
+  Short: 'short',
+  Nanoseconds: 'ns',
+} as const;
+export type SampleUnit = (typeof SampleUnit)[keyof typeof SampleUnit];
 
-export enum SelectedView {
-  TopTable = 'topTable',
-  FlameGraph = 'flameGraph',
-  Both = 'both',
-}
-
-export enum ViewMode {
-  Single = 'single',
-  Split = 'split',
-}
-
-export enum PaneView {
-  TopTable = 'topTable',
-  FlameGraph = 'flameGraph',
-  CallTree = 'callTree',
-}
+export const SelectedView = {
+  TopTable: 'topTable',
+  FlameGraph: 'flameGraph',
+  Both: 'both',
+} as const;
+export type SelectedView = (typeof SelectedView)[keyof typeof SelectedView];
 
 export interface TableData {
   self: number;
   total: number;
-  // For diff view
-  totalRight: number;
 }
 
-export enum ColorScheme {
-  ValueBased = 'valueBased',
-  PackageBased = 'packageBased',
-}
-
-export enum ColorSchemeDiff {
-  Default = 'default',
-  DiffColorBlind = 'diffColorBlind',
-}
+export const ColorScheme = {
+  ValueBased: 'valueBased',
+  PackageBased: 'packageBased',
+} as const;
+export type ColorScheme = (typeof ColorScheme)[keyof typeof ColorScheme];
 
 export type TextAlign = 'left' | 'right';

@@ -1,9 +1,4 @@
-import { scaleLinear } from 'd3';
 import color from 'tinycolor2';
-
-import { type GrafanaTheme2 } from '@grafana/data';
-
-import { ColorSchemeDiff } from '../types';
 
 import murmurhash3_32_gc from './murmur3';
 
@@ -43,7 +38,12 @@ export const byValueGradient = `linear-gradient(90deg, ${byValueMinColor} 0%, ${
 // Handpicked some vaguely rainbow-ish colors
 export const byPackageGradient = `linear-gradient(90deg, ${packageColors[0]} 0%, ${packageColors[2]} 30%, ${packageColors[6]} 50%, ${packageColors[7]} 70%, ${packageColors[8]} 100%)`;
 
-export function getBarColorByValue(value: number, totalTicks: number, rangeMin: number, rangeMax: number) {
+export function getBarColorByValue(
+  value: number,
+  totalTicks: number,
+  rangeMin: number,
+  rangeMax: number,
+) {
   //  / (rangeMax - rangeMin) here so when you click a bar it will adjust the top (clicked)bar to the most 'intense' color
   const intensity = Math.min(1, value / totalTicks / (rangeMax - rangeMin));
   const h = 50 - 50 * intensity;
@@ -52,69 +52,34 @@ export function getBarColorByValue(value: number, totalTicks: number, rangeMin: 
   return color({ h, s: 100, l });
 }
 
-export function getBarColorByPackage(label: string, theme: GrafanaTheme2) {
+export function getBarColorByPackage(label: string, isLight: boolean) {
   const packageName = getPackageName(label);
   // TODO: similar thing happens in trace view with selecting colors of the spans, so maybe this could be unified.
   const hash = murmurhash3_32_gc(packageName || '', 0);
   const colorIndex = hash % packageColors.length;
   let packageColor = packageColors[colorIndex].clone();
-  if (theme.isLight) {
+  if (isLight) {
     packageColor = packageColor.brighten(15);
   }
   return packageColor;
 }
 
-// green to red
-export const diffDefaultColors = ['rgb(0, 170, 0)', 'rgb(148, 142, 142)', 'rgb(200, 0, 0)'];
-export const diffDefaultGradient = `linear-gradient(90deg, ${diffDefaultColors[0]} 0%, ${diffDefaultColors[1]} 50%, ${diffDefaultColors[2]} 100%)`;
-export const diffColorBlindColors = ['rgb(26, 133, 255)', 'rgb(148, 142, 142)', 'rgb(220, 50, 32)'];
-export const diffColorBlindGradient = `linear-gradient(90deg, ${diffColorBlindColors[0]} 0%, ${diffColorBlindColors[1]} 50%, ${diffColorBlindColors[2]} 100%)`;
-
-export function getBarColorByDiff(
-  ticks: number,
-  ticksRight: number,
-  totalTicks: number,
-  totalTicksRight: number,
-  colorScheme: ColorSchemeDiff
-) {
-  const range = colorScheme === ColorSchemeDiff.Default ? diffDefaultColors : diffColorBlindColors;
-  const colorScale = scaleLinear()
-    .domain([-100, 0, 100])
-    // TODO types from DefinitelyTyped seem to mismatch
-    // @ts-ignore
-    .range(range);
-
-  const ticksLeft = ticks - ticksRight;
-  const totalTicksLeft = totalTicks - totalTicksRight;
-
-  if (totalTicksRight === 0 || totalTicksLeft === 0) {
-    // TODO types from DefinitelyTyped seem to mismatch
-    // @ts-ignore
-    const rgbString: string = colorScale(0);
-    // Fallback to neutral color as we probably have no data for one of the sides.
-    return color(rgbString);
-  }
-
-  const percentageLeft = Math.round((10000 * ticksLeft) / totalTicksLeft) / 100;
-  const percentageRight = Math.round((10000 * ticksRight) / totalTicksRight) / 100;
-
-  const diff = ((percentageRight - percentageLeft) / percentageLeft) * 100;
-
-  // TODO types from DefinitelyTyped seem to mismatch
-  // @ts-ignore
-  const rgbString: string = colorScale(diff);
-  return color(rgbString);
-}
-
-// const getColors = memoizeOne((theme) => getFilteredColors(colors, theme));
-
 // Different regexes to get the package name and function name from the label. We may at some point get an info about
 // the language from the backend and use the right regex but right now we just try all of them from most to least
 // specific.
 const matchers = [
-  ['phpspy', /^(?<packageName>([^\/]*\/)*)(?<filename>.*\.php+)(?<line_info>.*)$/],
-  ['pyspy', /^(?<packageName>([^\/]*\/)*)(?<filename>.*\.py+)(?<line_info>.*)$/],
-  ['rbspy', /^(?<packageName>([^\/]*\/)*)(?<filename>.*\.rb+)(?<line_info>.*)$/],
+  [
+    'phpspy',
+    /^(?<packageName>([^\/]*\/)*)(?<filename>.*\.php+)(?<line_info>.*)$/,
+  ],
+  [
+    'pyspy',
+    /^(?<packageName>([^\/]*\/)*)(?<filename>.*\.py+)(?<line_info>.*)$/,
+  ],
+  [
+    'rbspy',
+    /^(?<packageName>([^\/]*\/)*)(?<filename>.*\.rb+)(?<line_info>.*)$/,
+  ],
   [
     'nodespy',
     /^(\.\/node_modules\/)?(?<packageName>[^/]*)(?<filename>.*\.?(jsx?|tsx?)?):(?<functionName>.*):(?<line_info>.*)$/,

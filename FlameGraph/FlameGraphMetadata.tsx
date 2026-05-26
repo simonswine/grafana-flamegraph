@@ -1,12 +1,13 @@
-import { css } from '@emotion/css';
 import { memo, type ReactNode } from 'react';
 
-import { getValueFormat, type GrafanaTheme2 } from '@grafana/data';
-import { Icon, IconButton, Tooltip, useStyles2 } from '@grafana/ui';
+import { Icon, type IconType } from '@components/core/Icon';
 
+import { formatShort } from '../format';
 import { type ClickedItemData } from '../types';
 
 import { type FlameGraphDataContainer } from './dataTransform';
+
+import './FlameGraphMetadata.css';
 
 type Props = {
   data: FlameGraphDataContainer;
@@ -18,10 +19,16 @@ type Props = {
 };
 
 const FlameGraphMetadata = memo(
-  ({ data, focusedItem, totalTicks, sandwichedLabel, onFocusPillClick, onSandwichPillClick }: Props) => {
-    const styles = useStyles2(getStyles);
+  ({
+    data,
+    focusedItem,
+    totalTicks,
+    sandwichedLabel,
+    onFocusPillClick,
+    onSandwichPillClick,
+  }: Props) => {
     const parts: ReactNode[] = [];
-    const ticksVal = getValueFormat('short')(totalTicks);
+    const ticksVal = formatShort(totalTicks);
 
     const displayValue = data.valueDisplayProcessor(totalTicks);
     let unitValue = displayValue.text + displayValue.suffix;
@@ -34,99 +41,82 @@ const FlameGraphMetadata = memo(
     }
 
     parts.push(
-      <div className={styles.metadataPill} key={'default'}>
+      <div className="fg-metadata-pill" key={'default'}>
         {unitValue} | {ticksVal.text}
         {ticksVal.suffix} samples ({unitTitle})
-      </div>
+      </div>,
     );
 
     if (sandwichedLabel) {
       parts.push(
-        <Tooltip key={'sandwich'} content={sandwichedLabel} placement="top">
-          <div>
-            <Icon size={'sm'} name={'angle-right'} />
-            <div className={styles.metadataPill}>
-              <Icon size={'sm'} name={'gf-show-context'} />{' '}
-              <span className={styles.metadataPillName}>
-                {sandwichedLabel.substring(sandwichedLabel.lastIndexOf('/') + 1)}
-              </span>
-              <IconButton
-                className={styles.pillCloseButton}
-                name={'times'}
-                size={'sm'}
-                onClick={onSandwichPillClick}
-                tooltip={'Remove sandwich view'}
-                aria-label={'Remove sandwich view'}
-              />
-            </div>
+        <div
+          key={'sandwich'}
+          title={sandwichedLabel}
+          className="fg-metadata-pill-group"
+        >
+          <Icon size={12} name="angle-right" />
+          <div className="fg-metadata-pill">
+            <Icon size={12} name="sandwich" />
+            <span className="fg-metadata-pill-name">
+              {sandwichedLabel.substring(sandwichedLabel.lastIndexOf('/') + 1)}
+            </span>
+            <PillCloseButton
+              onClick={onSandwichPillClick}
+              label="Remove sandwich view"
+            />
           </div>
-        </Tooltip>
+        </div>,
       );
     }
 
     if (focusedItem) {
-      const percentValue = totalTicks > 0 ? Math.round(10000 * (focusedItem.item.value / totalTicks)) / 100 : 0;
-      const iconName = percentValue > 0 ? 'eye' : 'exclamation-circle';
+      const percentValue =
+        totalTicks > 0
+          ? Math.round(10000 * (focusedItem.item.value / totalTicks)) / 100
+          : 0;
+      const iconName: IconType =
+        percentValue > 0 ? 'eye' : 'exclamation-circle';
 
       parts.push(
-        <Tooltip key={'focus'} content={focusedItem.label} placement="top">
-          <div>
-            <Icon size={'sm'} name={'angle-right'} />
-            <div className={styles.metadataPill}>
-              <Icon size={'sm'} name={iconName} />
-              &nbsp;{percentValue}% of total
-              <IconButton
-                className={styles.pillCloseButton}
-                name={'times'}
-                size={'sm'}
-                onClick={onFocusPillClick}
-                tooltip={'Remove focus'}
-                aria-label={'Remove focus'}
-              />
-            </div>
+        <div
+          key={'focus'}
+          title={focusedItem.label}
+          className="fg-metadata-pill-group"
+        >
+          <Icon size={12} name="angle-right" />
+          <div className="fg-metadata-pill">
+            <Icon size={12} name={iconName} />
+            &nbsp;{percentValue}% of total
+            <PillCloseButton onClick={onFocusPillClick} label="Remove focus" />
           </div>
-        </Tooltip>
+        </div>,
       );
     }
 
-    return <div className={styles.metadata}>{parts}</div>;
-  }
+    return <div className="fg-metadata">{parts}</div>;
+  },
 );
 
 FlameGraphMetadata.displayName = 'FlameGraphMetadata';
 
-const getStyles = (theme: GrafanaTheme2) => ({
-  metadataPill: css({
-    label: 'metadataPill',
-    display: 'inline-flex',
-    alignItems: 'center',
-    background: theme.colors.background.secondary,
-    borderRadius: theme.shape.borderRadius(8),
-    padding: theme.spacing(0.5, 1),
-    fontSize: theme.typography.bodySmall.fontSize,
-    fontWeight: theme.typography.fontWeightMedium,
-    lineHeight: theme.typography.bodySmall.lineHeight,
-    color: theme.colors.text.secondary,
-  }),
-  pillCloseButton: css({
-    label: 'pillCloseButton',
-    verticalAlign: 'text-bottom',
-    margin: theme.spacing(0, 0.5),
-  }),
-  metadata: css({
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    margin: '8px 0',
-  }),
-  metadataPillName: css({
-    label: 'metadataPillName',
-    maxWidth: '200px',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-    marginLeft: theme.spacing(0.5),
-  }),
-});
+function PillCloseButton({
+  onClick,
+  label,
+}: {
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      className="fg-metadata-pill-close"
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+    >
+      <Icon name="times" size={12} />
+    </button>
+  );
+}
 
 export default FlameGraphMetadata;
