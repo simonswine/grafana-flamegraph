@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
-import { Icon, type IconType } from '@components/core/Icon';
+import { Icon, type IconType } from '../Icon';
 
 import './FlameGraphContextMenu.css';
 

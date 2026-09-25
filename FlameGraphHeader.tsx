@@ -1,7 +1,7 @@
 import { useEffect, useId, useState } from 'react';
 import * as React from 'react';
 
-import { Icon, type IconType } from '@components/core/Icon';
+import { Icon, type IconType } from './Icon';
 
 import { ColorSchemeButton } from './ColorSchemeButton';
 import { type CollapsedMap } from './FlameGraph/dataTransform';
@@ -16,6 +16,7 @@ type Props = {
   search: string;
   setSearch: (search: string) => void;
   selectedView: SelectedView;
+  hideViewSelector?: boolean;
   setSelectedView: (view: SelectedView) => void;
   containerWidth: number;
   onReset: () => void;
@@ -126,7 +127,7 @@ const FlameGraphHeader = (props: Props) => {
             { value: 'right', title: 'Align text right', icon: 'align-right' },
           ]}
         />
-        <RadioGroup
+        {!props.hideViewSelector && <RadioGroup
           name="selected-view"
           value={selectedView}
           onChange={setSelectedView}
@@ -135,7 +136,7 @@ const FlameGraphHeader = (props: Props) => {
             title: o.label,
             label: o.label,
           }))}
-        />
+        />}
         {extraHeaderElements && (
           <div className="fg-header-extra-elements">{extraHeaderElements}</div>
         )}

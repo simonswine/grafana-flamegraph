@@ -18,7 +18,7 @@
 // THIS SOFTWARE.
 import { useEffect, useState } from 'react';
 
-import { Icon } from '@components/core/Icon';
+import { Icon } from '../Icon';
 
 import { PIXELS_PER_LEVEL } from '../constants';
 import { cx } from '../cx';

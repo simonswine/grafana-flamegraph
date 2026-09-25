@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { Icon, type IconType } from '@components/core/Icon';
+import { Icon, type IconType } from '../Icon';
 
 import { type FlameGraphDataContainer } from '../FlameGraph/dataTransform';
 import { escapeRegex } from '../format';

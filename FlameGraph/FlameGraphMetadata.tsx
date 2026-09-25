@@ -1,6 +1,6 @@
 import { memo, type ReactNode } from 'react';
 
-import { Icon, type IconType } from '@components/core/Icon';
+import { Icon, type IconType } from '../Icon';
 
 import { formatShort } from '../format';
 import { type ClickedItemData } from '../types';

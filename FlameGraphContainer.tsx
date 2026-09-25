@@ -12,9 +12,12 @@ import {
 import { escapeRegex } from './format';
 import FlameGraphHeader from './FlameGraphHeader';
 import FlameGraphTopTableContainer from './TopTable/FlameGraphTopTableContainer';
+import { StacktraceTable } from './CallTree/StacktraceTable';
 import { MIN_WIDTH_TO_SHOW_BOTH_TOPTABLE_AND_FLAMEGRAPH } from './constants';
 
+import './pyroscope-theme.css';
 import './FlameGraphContainer.css';
+import './Layout.css';
 import { useColorScheme, useMeasure } from './hooks';
 import { type ClickedItemData, SelectedView, type TextAlign } from './types';
 
@@ -72,6 +75,8 @@ export type Props = {
    * Whether or not to keep any focused item when the profile data changes.
    */
   keepFocusOnDataChange?: boolean;
+  /** Initial layout: one pane or two independently selectable panes. */
+  initialViewMode?: 'single' | 'dual';
 };
 
 const FlameGraphContainer = ({
@@ -86,6 +91,7 @@ const FlameGraphContainer = ({
   showFlameGraphOnly,
   disableCollapsing,
   keepFocusOnDataChange,
+  initialViewMode = 'dual',
   getExtraContextMenuButtons,
 }: Props) => {
   const [focusedItemData, setFocusedItemData] = useState<ClickedItemData>();
@@ -93,9 +99,11 @@ const FlameGraphContainer = ({
   const [rangeMin, setRangeMin] = useState(0);
   const [rangeMax, setRangeMax] = useState(1);
   const [search, setSearch] = useState('');
-  const [selectedView, setSelectedView] = useState<SelectedView>(
-    SelectedView.Both,
-  );
+  const [viewMode, setViewMode] = useState<'single' | 'dual'>(initialViewMode);
+  const [leftView, setLeftView] = useState<'flameGraph' | 'topTable' | 'callTree'>('topTable');
+  const [rightView, setRightView] = useState<'flameGraph' | 'topTable' | 'callTree'>('flameGraph');
+  const [singleView, setSingleView] = useState<'flameGraph' | 'topTable' | 'callTree'>('flameGraph');
+  const [selectedView, setSelectedView] = useState<SelectedView>(SelectedView.Both);
   const [sizeRef, { width: containerWidth }] = useMeasure<HTMLDivElement>();
   const [textAlign, setTextAlign] = useState<TextAlign>('left');
   // This is a label of the item because in sandwich view we group all items by label and present a merged graph
@@ -261,28 +269,27 @@ const FlameGraphContainer = ({
     />
   );
 
-  let body;
-  if (showFlameGraphOnly || selectedView === SelectedView.FlameGraph) {
-    body = flameGraph;
-  } else if (selectedView === SelectedView.TopTable) {
-    body = <div className="fg-table-container">{table}</div>;
-  } else if (selectedView === SelectedView.Both) {
-    if (vertical) {
-      body = (
-        <div>
-          <div className="fg-vertical-graph">{flameGraph}</div>
-          <div className="fg-vertical-table">{table}</div>
-        </div>
-      );
-    } else {
-      body = (
-        <div className="fg-horizontal-container">
-          <div className="fg-horizontal-table">{table}</div>
-          <div className="fg-horizontal-graph">{flameGraph}</div>
-        </div>
-      );
-    }
-  }
+  const pane = (view: typeof singleView) => view === 'flameGraph' ? flameGraph : view === 'topTable'
+    ? <div className="fg-table-container">{table}</div>
+    : <StacktraceTable data={dataContainer} search={search} onSymbolClick={onSymbolClick} />;
+
+  const viewPicker = (view: typeof singleView, position: 'View' | 'Left' | 'Right' | 'Top' | 'Bottom', select: (value: typeof singleView) => void) => (
+    <div className="fg-view-picker">
+      <span>{position}</span>
+      <div className="fg-segmented" role="group" aria-label={`${position} pane view`}>
+        {([
+          ['flameGraph', 'Flame graph'],
+          ['topTable', 'Top table'],
+          ['callTree', 'Stacktrace table'],
+        ] as const).map(([value, title]) =>
+          <button key={value} type="button" aria-pressed={view === value} onClick={() => {
+            select(value);
+            onViewSelected?.(value);
+          }}>{title}</button>
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <div ref={sizeRef} className="fg-container">
@@ -291,10 +298,8 @@ const FlameGraphContainer = ({
           search={search}
           setSearch={setSearch}
           selectedView={selectedView}
-          setSelectedView={(view) => {
-            setSelectedView(view);
-            onViewSelected?.(view);
-          }}
+          setSelectedView={setSelectedView}
+          hideViewSelector
           containerWidth={containerWidth}
           onReset={() => {
             resetFocus();
@@ -316,7 +321,28 @@ const FlameGraphContainer = ({
         />
       )}
 
-      <div className="fg-body">{body}</div>
+      {!showFlameGraphOnly && <div className="fg-layout-controls">
+        <div role="group" aria-label="Layout">
+          <button type="button" aria-pressed={viewMode === 'single'} onClick={() => setViewMode('single')}>Single</button>
+          <button type="button" aria-pressed={viewMode === 'dual'} onClick={() => setViewMode('dual')}>Dual</button>
+        </div>
+
+      </div>}
+      <div className="fg-body">{showFlameGraphOnly ? flameGraph : viewMode === 'single' ?
+        <div className="fg-pane-with-picker">
+          {viewPicker(singleView, 'View', setSingleView)}
+          <div className="fg-pane-content">{pane(singleView)}</div>
+        </div> :
+        <div className={vertical ? 'fg-dual-vertical' : 'fg-dual'}>
+          <div className="fg-dual-pane">
+            {viewPicker(leftView, vertical ? 'Top' : 'Left', setLeftView)}
+            <div className="fg-pane-content">{pane(leftView)}</div>
+          </div>
+          <div className="fg-dual-pane">
+            {viewPicker(rightView, vertical ? 'Bottom' : 'Right', setRightView)}
+            <div className="fg-pane-content">{pane(rightView)}</div>
+          </div>
+        </div>}</div>
     </div>
   );
 };
