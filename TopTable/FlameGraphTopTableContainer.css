@@ -25,6 +25,8 @@
   font-size: var(--text-sm);
 }
 
+.fg-tt-diff .fg-tt-table { min-width: 580px; }
+
 .fg-tt-thead {
   position: sticky;
   top: 0;
@@ -124,6 +126,12 @@
 .fg-tt-symbol-link:hover {
   text-decoration: underline;
 }
+
+.fg-tt-metric-cell { padding-top: 2px; padding-bottom: 2px; }
+.fg-tt-metric-cell > span { display: block; line-height: 14px; }
+/* The entire cell is the 100% reference; the colored bar fills its share. */
+.fg-tt-metric-track { width: 100%; height: 3px; margin-top: 2px; background: var(--border-weak); }
+.fg-tt-metric-bar { height: 100%; }
 
 .fg-tt-numeric-cell {
   text-align: right;

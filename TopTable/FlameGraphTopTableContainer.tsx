@@ -4,13 +4,16 @@ import { Icon, type IconType } from '../Icon';
 
 import { type FlameGraphDataContainer } from '../FlameGraph/dataTransform';
 import { escapeRegex } from '../format';
-import { type TableData } from '../types';
+import { type TableData, type ColorScheme, type ColorSchemeDiff } from '../types';
+import { useIsLight } from '../theme';
+import { getSymbolColor, TableMetricCell } from '../TableMetricCell';
 
 import './FlameGraphTopTableContainer.css';
 
 type Props = {
   data: FlameGraphDataContainer;
   diffMode?: 'proportionalDiff' | 'absoluteDiff';
+  colorScheme?: ColorScheme | ColorSchemeDiff;
   onSymbolClick: (symbol: string) => void;
   // This is used for highlighting the search button in case there is exact match.
   search?: string;
@@ -38,6 +41,7 @@ const FlameGraphTopTableContainer = memo(
   ({
     data,
     diffMode,
+    colorScheme,
     onSymbolClick,
     search,
     matchedLabels,
@@ -46,6 +50,7 @@ const FlameGraphTopTableContainer = memo(
     onSandwich,
     onTableSort,
   }: Props) => {
+    const isLight = useIsLight();
     const rows = useMemo(() => {
       const grouped = buildFilteredTable(data, matchedLabels);
       return Object.entries(grouped).map(([symbol, v]) => ({
@@ -145,7 +150,7 @@ const FlameGraphTopTableContainer = memo(
     const padBottom = (sortedRows.length - endIdx) * ROW_HEIGHT;
 
     return (
-      <div className={'fg-tt-container'} data-testid="topTable">
+      <div className={`fg-tt-container${data.isDiffFlamegraph() ? ' fg-tt-diff' : ''}`} data-testid="topTable">
         <div ref={scrollRef} className={'fg-tt-scroll'}>
           <table className={'fg-tt-table'} role="table">
             <thead className={'fg-tt-thead'}>
@@ -183,6 +188,8 @@ const FlameGraphTopTableContainer = memo(
                   key={row.symbol}
                   data={data}
                   diffMode={diffMode}
+                  colorScheme={colorScheme}
+                  isLight={isLight}
                   row={row}
                   search={search}
                   sandwichItem={sandwichItem}
@@ -254,6 +261,8 @@ type TableRowProps = {
   data: FlameGraphDataContainer;
   row: Row;
   diffMode?: 'proportionalDiff' | 'absoluteDiff';
+  colorScheme?: ColorScheme | ColorSchemeDiff;
+  isLight?: boolean;
   search?: string;
   sandwichItem?: string;
   onSymbolClick: (symbol: string) => void;
@@ -265,6 +274,8 @@ function TableRowInner({
   data,
   row,
   diffMode,
+  colorScheme,
+  isLight = false,
   search,
   sandwichItem,
   onSymbolClick,
@@ -276,6 +287,10 @@ function TableRowInner({
 
   const selfDisp = data.valueDisplayProcessor(row.self);
   const totalDisp = data.valueDisplayProcessor(row.total);
+  const profileTotal = data.getValue(0);
+  const profileRight = data.getValueRight(0);
+  const symbolColor = getSymbolColor(row.symbol, row.total, profileTotal + profileRight,
+    row.totalRight, profileRight, isLight, colorScheme ?? 'packageBased', diffMode);
 
   const onSandwichClick = useCallback(
     () => onSandwich(isSandwiched ? undefined : row.symbol),
@@ -334,16 +349,22 @@ function TableRowInner({
         if (diffMode === 'absoluteDiff') {
           const left = row.total - row.totalRight, right = row.totalRight;
           const delta = right - left;
-          return <><td className="fg-tt-numeric-cell">{formatValue(data.valueDisplayProcessor(left))}</td>
-            <td className="fg-tt-numeric-cell">{formatValue(data.valueDisplayProcessor(right))}</td>
+          return <><TableMetricCell label="Baseline" value={left} total={leftTotal}
+            display={formatValue(data.valueDisplayProcessor(left))} color={symbolColor} />
+            <TableMetricCell label="Comparison" value={right} total={rightTotal}
+              display={formatValue(data.valueDisplayProcessor(right))} color={symbolColor} />
             <td className="fg-tt-numeric-cell" style={{ color: delta > 0 ? 'var(--red-300)' : 'var(--green-300)' }}>
               {delta >= 0 ? '+' : '−'}{formatValue(data.valueDisplayProcessor(Math.abs(delta)))}</td></>;
         }
-        return <><td className="fg-tt-numeric-cell">{baseline.toFixed(2)}%</td>
-          <td className="fg-tt-numeric-cell">{comparison.toFixed(2)}%</td>
+        return <><TableMetricCell label="Baseline" value={row.total - row.totalRight} total={leftTotal}
+          display={`${baseline.toFixed(2)}%`} color={symbolColor} />
+          <TableMetricCell label="Comparison" value={row.totalRight} total={rightTotal}
+            display={`${comparison.toFixed(2)}%`} color={symbolColor} />
           <td className="fg-tt-numeric-cell" style={{ color: diff > 0 ? 'var(--red-300)' : 'var(--green-300)' }}>{baseline ? `${diff.toFixed(2)}%` : '—'}</td></>;
-      })() : <><td className={'fg-tt-numeric-cell'}>{formatValue(selfDisp)}</td>
-      <td className={'fg-tt-numeric-cell'}>{formatValue(totalDisp)}</td></>}
+      })() : <><TableMetricCell label="Self" value={row.self} total={profileTotal}
+        display={formatValue(selfDisp)} color={symbolColor} />
+      <TableMetricCell label="Total" value={row.total} total={profileTotal}
+        display={formatValue(totalDisp)} color={symbolColor} /></>}
     </tr>
   );
 }
