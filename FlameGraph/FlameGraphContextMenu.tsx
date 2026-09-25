@@ -1,16 +1,16 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { type ReactNode, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
 import { Icon, type IconType } from '../Icon';
 
 import './FlameGraphContextMenu.css';
 
-import { type ClickedItemData, type SelectedView } from '../types';
+import type { ClickedItemData, SelectedView } from '../types';
 
-import {
-  type CollapseConfig,
-  type DataFrame,
-  type FlameGraphDataContainer,
+import type {
+  CollapseConfig,
+  DataFrame,
+  FlameGraphDataContainer,
 } from './dataTransform';
 
 export type GetExtraContextMenuButtonsFunction = (

@@ -7,7 +7,7 @@ corepack pnpm install
 corepack pnpm storybook
 ```
 
-Build the publishable package with `corepack pnpm build`, the static Storybook with `corepack pnpm build-storybook`, and run the control regression tests with `corepack pnpm test`.
+Build the publishable package with `corepack pnpm build`, the static Storybook with `corepack pnpm build-storybook`, and run the control regression tests with `corepack pnpm test`. Biome handles linting and formatting: run `corepack pnpm check` to check both (plus import organization), or `corepack pnpm exec biome check --write .` to apply safe fixes. `corepack pnpm lint`, `corepack pnpm format:check`, and `corepack pnpm format` are also available. Existing lint findings are reported as warnings so the check passes while new code can be improved incrementally.
 
 ```tsx
 import { FlameGraph } from 'grafana-flamegraph-solo';

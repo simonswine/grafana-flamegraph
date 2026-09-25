@@ -1,4 +1,9 @@
-import { byPackageGradient, byValueGradient, diffDefaultGradient, diffColorBlindGradient } from './FlameGraph/colors';
+import {
+  byPackageGradient,
+  byValueGradient,
+  diffColorBlindGradient,
+  diffDefaultGradient,
+} from './FlameGraph/colors';
 import { Popover, PopoverItem } from './Popover';
 import { ColorScheme, ColorSchemeDiff } from './types';
 import './ColorSchemeButton.css';
@@ -11,8 +16,12 @@ type ColorSchemeButtonProps = {
 
 export function ColorSchemeButton(props: ColorSchemeButtonProps) {
   const gradient = props.isDiffMode
-    ? props.value === ColorSchemeDiff.DiffColorBlind ? diffColorBlindGradient : diffDefaultGradient
-    : props.value === ColorScheme.PackageBased ? byPackageGradient : byValueGradient;
+    ? props.value === ColorSchemeDiff.DiffColorBlind
+      ? diffColorBlindGradient
+      : diffDefaultGradient
+    : props.value === ColorScheme.PackageBased
+      ? byPackageGradient
+      : byValueGradient;
 
   return (
     <Popover
@@ -29,29 +38,45 @@ export function ColorSchemeButton(props: ColorSchemeButtonProps) {
       )}
       overlay={({ close }) => (
         <>
-          {props.isDiffMode ? <>
-            <PopoverItem label="Diff" active={props.value === ColorSchemeDiff.Default}
-              onClick={() => { props.onChange(ColorSchemeDiff.Default); close(); }} />
-            <PopoverItem label="Diff (color blind)" active={props.value === ColorSchemeDiff.DiffColorBlind}
-              onClick={() => { props.onChange(ColorSchemeDiff.DiffColorBlind); close(); }} />
-          </> : <>
-          <PopoverItem
-            label="By package name"
-            active={props.value === ColorScheme.PackageBased}
-            onClick={() => {
-              props.onChange(ColorScheme.PackageBased);
-              close();
-            }}
-          />
-          <PopoverItem
-            label="By value"
-            active={props.value === ColorScheme.ValueBased}
-            onClick={() => {
-              props.onChange(ColorScheme.ValueBased);
-              close();
-            }}
-          />
-          </>}
+          {props.isDiffMode ? (
+            <>
+              <PopoverItem
+                label="Diff"
+                active={props.value === ColorSchemeDiff.Default}
+                onClick={() => {
+                  props.onChange(ColorSchemeDiff.Default);
+                  close();
+                }}
+              />
+              <PopoverItem
+                label="Diff (color blind)"
+                active={props.value === ColorSchemeDiff.DiffColorBlind}
+                onClick={() => {
+                  props.onChange(ColorSchemeDiff.DiffColorBlind);
+                  close();
+                }}
+              />
+            </>
+          ) : (
+            <>
+              <PopoverItem
+                label="By package name"
+                active={props.value === ColorScheme.PackageBased}
+                onClick={() => {
+                  props.onChange(ColorScheme.PackageBased);
+                  close();
+                }}
+              />
+              <PopoverItem
+                label="By value"
+                active={props.value === ColorScheme.ValueBased}
+                onClick={() => {
+                  props.onChange(ColorScheme.ValueBased);
+                  close();
+                }}
+              />
+            </>
+          )}
         </>
       )}
     />

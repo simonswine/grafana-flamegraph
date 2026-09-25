@@ -1,8 +1,8 @@
-import { type LevelItem } from './FlameGraph/dataTransform';
+import type { LevelItem } from './FlameGraph/dataTransform';
 
-export { type FlameGraphDataContainer } from './FlameGraph/dataTransform';
+export type { FlameGraphDataContainer } from './FlameGraph/dataTransform';
 
-export { type ExtraContextMenuButton } from './FlameGraph/FlameGraphContextMenu';
+export type { ExtraContextMenuButton } from './FlameGraph/FlameGraphContextMenu';
 
 export type ClickedItemData = {
   posX: number;
@@ -43,6 +43,7 @@ export const ColorSchemeDiff = {
   Default: 'default',
   DiffColorBlind: 'diffColorBlind',
 } as const;
-export type ColorSchemeDiff = (typeof ColorSchemeDiff)[keyof typeof ColorSchemeDiff];
+export type ColorSchemeDiff =
+  (typeof ColorSchemeDiff)[keyof typeof ColorSchemeDiff];
 
 export type TextAlign = 'left' | 'right';

@@ -1,12 +1,12 @@
 import {
   type DependencyList,
+  type RefObject,
   useEffect,
   useRef,
   useState,
-  type RefObject,
 } from 'react';
 
-import { type FlameGraphDataContainer } from './FlameGraph/dataTransform';
+import type { FlameGraphDataContainer } from './FlameGraph/dataTransform';
 import { ColorScheme, ColorSchemeDiff } from './types';
 
 /**

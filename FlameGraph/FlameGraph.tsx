@@ -17,28 +17,25 @@
 // TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
 // THIS SOFTWARE.
 import { useEffect, useState } from 'react';
-
-import { Icon } from '../Icon';
-
 import { PIXELS_PER_LEVEL } from '../constants';
 import { cx } from '../cx';
-import {
-  type ClickedItemData,
-  type ColorScheme,
-  type ColorSchemeDiff,
-  type SelectedView,
-  type TextAlign,
+import { Icon } from '../Icon';
+import type {
+  ClickedItemData,
+  ColorScheme,
+  ColorSchemeDiff,
+  SelectedView,
+  TextAlign,
 } from '../types';
-
-import FlameGraphCanvas from './FlameGraphCanvas';
 import { diffColorBlindGradient, diffDefaultGradient } from './colors';
-import { type GetExtraContextMenuButtonsFunction } from './FlameGraphContextMenu';
-import FlameGraphMetadata from './FlameGraphMetadata';
-import {
-  type CollapsedMap,
-  type FlameGraphDataContainer,
-  type LevelItem,
+import type {
+  CollapsedMap,
+  FlameGraphDataContainer,
+  LevelItem,
 } from './dataTransform';
+import FlameGraphCanvas from './FlameGraphCanvas';
+import type { GetExtraContextMenuButtonsFunction } from './FlameGraphContextMenu';
+import FlameGraphMetadata from './FlameGraphMetadata';
 
 import './FlameGraph.css';
 
@@ -99,13 +96,15 @@ const FlameGraph = ({
   const [levelsCallers, setLevelsCallers] = useState<LevelItem[][]>();
   const [totalViewTicks, setTotalViewTicks] = useState<number>(0);
   const totalProfileTicks = data.getLevels()[0]?.[0]?.value ?? 0;
-  const totalProfileTicksRight = data.isDiffFlamegraph() ? data.getLevels()[0]?.[0]?.valueRight : undefined;
+  const totalProfileTicksRight = data.isDiffFlamegraph()
+    ? data.getLevels()[0]?.[0]?.valueRight
+    : undefined;
 
   useEffect(() => {
     if (data) {
       let levels = data.getLevels();
       let totalViewTicks = levels.length ? levels[0][0].value : 0;
-      let levelsCallers = undefined;
+      let levelsCallers;
 
       if (sandwichItem) {
         const [callers, callees] = data.getSandwichLevels(sandwichItem);
@@ -212,18 +211,44 @@ const FlameGraph = ({
         onSandwichPillClick={onSandwichPillClick}
       />
       {canvas}
-      {data.isDiffFlamegraph() && <div className="fg-diff-legend" role="note" aria-label={`${diffMode === 'absoluteDiff' ? 'Absolute' : 'Proportional'} diff flamegraph color legend`}>
-        <strong>{diffMode === 'absoluteDiff' ? 'Absolute diff' : 'Proportional diff'}</strong>
-        <div className="fg-diff-legend-scale" style={{ background: colorScheme === 'diffColorBlind' ? diffColorBlindGradient : diffDefaultGradient }} aria-hidden="true" />
-        <div className="fg-diff-legend-labels">
-          <span>{colorScheme === 'diffColorBlind' ? 'Blue' : 'Green'}: decreased</span>
-          <span>Gray: unchanged</span>
-          <span>{colorScheme === 'diffColorBlind' ? 'Orange-red' : 'Red'}: increased</span>
+      {data.isDiffFlamegraph() && (
+        <div
+          className="fg-diff-legend"
+          role="note"
+          aria-label={`${diffMode === 'absoluteDiff' ? 'Absolute' : 'Proportional'} diff flamegraph color legend`}
+        >
+          <strong>
+            {diffMode === 'absoluteDiff'
+              ? 'Absolute diff'
+              : 'Proportional diff'}
+          </strong>
+          <div
+            className="fg-diff-legend-scale"
+            style={{
+              background:
+                colorScheme === 'diffColorBlind'
+                  ? diffColorBlindGradient
+                  : diffDefaultGradient,
+            }}
+            aria-hidden="true"
+          />
+          <div className="fg-diff-legend-labels">
+            <span>
+              {colorScheme === 'diffColorBlind' ? 'Blue' : 'Green'}: decreased
+            </span>
+            <span>Gray: unchanged</span>
+            <span>
+              {colorScheme === 'diffColorBlind' ? 'Orange-red' : 'Red'}:
+              increased
+            </span>
+          </div>
+          <small>
+            {diffMode === 'absoluteDiff'
+              ? 'Color shows the raw sample count change (comparison minus baseline); intensity is scaled to the larger profile’s total. Bar width is the combined total.'
+              : 'Node labels show the percentage change in each function’s share of the profile from baseline to comparison (or “new” if its baseline share was zero). Color shows the same change, not the change in raw samples. Bar width is the combined total.'}
+          </small>
         </div>
-        <small>{diffMode === 'absoluteDiff'
-          ? 'Color shows the raw sample count change (comparison minus baseline); intensity is scaled to the larger profile’s total. Bar width is the combined total.'
-          : 'Node labels show the percentage change in each function’s share of the profile from baseline to comparison (or “new” if its baseline share was zero). Color shows the same change, not the change in raw samples. Bar width is the combined total.'}</small>
-      </div>}
+      )}
     </div>
   );
 };

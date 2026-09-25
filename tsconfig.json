@@ -10,18 +10,10 @@
     "declaration": true,
     "declarationDir": "./dist/types",
     "emitDeclarationOnly": true,
-    "types": [
-      "node"
-    ],
-    "lib": [
-      "ES2020",
-      "DOM"
-    ]
+    "types": ["node"],
+    "lib": ["ES2020", "DOM"]
   },
-  "include": [
-    "**/*.ts",
-    "**/*.tsx"
-  ],
+  "include": ["**/*.ts", "**/*.tsx"],
   "exclude": [
     "dist",
     "node_modules",

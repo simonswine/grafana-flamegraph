@@ -1,13 +1,11 @@
+import type * as React from 'react';
 import { useEffect, useId, useState } from 'react';
-import * as React from 'react';
-
-import { Icon, type IconType } from './Icon';
-
 import { ColorSchemeButton } from './ColorSchemeButton';
-import { type CollapsedMap } from './FlameGraph/dataTransform';
 import { cx } from './cx';
+import type { CollapsedMap } from './FlameGraph/dataTransform';
 import { useDebounce, usePrevious } from './hooks';
-import { type ColorScheme, type ColorSchemeDiff, type TextAlign } from './types';
+import { Icon, type IconType } from './Icon';
+import type { ColorScheme, ColorSchemeDiff, TextAlign } from './types';
 
 import './FlameGraphHeader.css';
 
@@ -89,15 +87,35 @@ const FlameGraphHeader = (props: Props) => {
         )}
         <div className="fg-header-control fg-header-spacing-right">
           <span>Colors</span>
-          <ColorSchemeButton value={colorScheme} onChange={onColorSchemeChange} isDiffMode={props.isDiffMode} />
+          <ColorSchemeButton
+            value={colorScheme}
+            onChange={onColorSchemeChange}
+            isDiffMode={props.isDiffMode}
+          />
         </div>
-        {props.viewMode && props.setViewMode && <div className="fg-layout-picker fg-header-spacing-right">
-          <span>Layout</span>
-          <div className="fg-segmented" role="group" aria-label="Layout">
-            <button type="button" title="Show one visualization pane" aria-pressed={props.viewMode === 'single'} onClick={() => props.setViewMode?.('single')}>Single</button>
-            <button type="button" title="Show two independently configured visualization panes" aria-pressed={props.viewMode === 'dual'} onClick={() => props.setViewMode?.('dual')}>Dual</button>
+        {props.viewMode && props.setViewMode && (
+          <div className="fg-layout-picker fg-header-spacing-right">
+            <span>Layout</span>
+            <div className="fg-segmented" role="group" aria-label="Layout">
+              <button
+                type="button"
+                title="Show one visualization pane"
+                aria-pressed={props.viewMode === 'single'}
+                onClick={() => props.setViewMode?.('single')}
+              >
+                Single
+              </button>
+              <button
+                type="button"
+                title="Show two independently configured visualization panes"
+                aria-pressed={props.viewMode === 'dual'}
+                onClick={() => props.setViewMode?.('dual')}
+              >
+                Dual
+              </button>
+            </div>
           </div>
-        </div>}
+        )}
         <div className="fg-header-control fg-header-spacing-right">
           <span>Grouping</span>
           <div className="fg-header-btn-group">
@@ -105,14 +123,18 @@ const FlameGraphHeader = (props: Props) => {
               icon="angle-double-down"
               label="Expand all groups"
               disabled={props.disableCollapsing || collapsedMap.size() === 0}
-              onClick={() => setCollapsedMap(collapsedMap.setAllCollapsedStatus(false))}
+              onClick={() =>
+                setCollapsedMap(collapsedMap.setAllCollapsedStatus(false))
+              }
               grouped
             />
             <IconBtn
               icon="angle-double-up"
               label="Collapse all groups"
               disabled={props.disableCollapsing || collapsedMap.size() === 0}
-              onClick={() => setCollapsedMap(collapsedMap.setAllCollapsedStatus(true))}
+              onClick={() =>
+                setCollapsedMap(collapsedMap.setAllCollapsedStatus(true))
+              }
               grouped
             />
           </div>
@@ -124,8 +146,16 @@ const FlameGraphHeader = (props: Props) => {
             value={textAlign}
             onChange={onTextAlignChange}
             options={[
-              { value: 'left', title: 'Align clipped text left', icon: 'align-left' },
-              { value: 'right', title: 'Align clipped text right', icon: 'align-right' },
+              {
+                value: 'left',
+                title: 'Align clipped text left',
+                icon: 'align-left',
+              },
+              {
+                value: 'right',
+                title: 'Align clipped text right',
+                icon: 'align-right',
+              },
             ]}
           />
         </div>

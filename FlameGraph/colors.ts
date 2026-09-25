@@ -70,16 +70,10 @@ export function getBarColorByPackage(label: string, isLight: boolean) {
 const matchers = [
   [
     'phpspy',
-    /^(?<packageName>([^\/]*\/)*)(?<filename>.*\.php+)(?<line_info>.*)$/,
+    /^(?<packageName>([^/]*\/)*)(?<filename>.*\.php+)(?<line_info>.*)$/,
   ],
-  [
-    'pyspy',
-    /^(?<packageName>([^\/]*\/)*)(?<filename>.*\.py+)(?<line_info>.*)$/,
-  ],
-  [
-    'rbspy',
-    /^(?<packageName>([^\/]*\/)*)(?<filename>.*\.rb+)(?<line_info>.*)$/,
-  ],
+  ['pyspy', /^(?<packageName>([^/]*\/)*)(?<filename>.*\.py+)(?<line_info>.*)$/],
+  ['rbspy', /^(?<packageName>([^/]*\/)*)(?<filename>.*\.rb+)(?<line_info>.*)$/],
   [
     'nodespy',
     /^(\.\/node_modules\/)?(?<packageName>[^/]*)(?<filename>.*\.?(jsx?|tsx?)?):(?<functionName>.*):(?<line_info>.*)$/,
@@ -104,9 +98,17 @@ function getPackageName(name: string): string | undefined {
   return undefined;
 }
 
-export const diffDefaultColors = ['rgb(0, 170, 0)', 'rgb(148, 142, 142)', 'rgb(200, 0, 0)'];
+export const diffDefaultColors = [
+  'rgb(0, 170, 0)',
+  'rgb(148, 142, 142)',
+  'rgb(200, 0, 0)',
+];
 export const diffDefaultGradient = `linear-gradient(90deg, ${diffDefaultColors[0]} 0%, ${diffDefaultColors[1]} 50%, ${diffDefaultColors[2]} 100%)`;
-export const diffColorBlindColors = ['rgb(26, 133, 255)', 'rgb(148, 142, 142)', 'rgb(220, 50, 32)'];
+export const diffColorBlindColors = [
+  'rgb(26, 133, 255)',
+  'rgb(148, 142, 142)',
+  'rgb(220, 50, 32)',
+];
 export const diffColorBlindGradient = `linear-gradient(90deg, ${diffColorBlindColors[0]} 0%, ${diffColorBlindColors[1]} 50%, ${diffColorBlindColors[2]} 100%)`;
 
 export function getBarColorByDiff(
@@ -115,33 +117,47 @@ export function getBarColorByDiff(
   totalTicks: number,
   totalTicksRight: number,
   colorScheme: 'default' | 'diffColorBlind',
-  diffMode: 'proportionalDiff' | 'absoluteDiff' = 'proportionalDiff'
+  diffMode: 'proportionalDiff' | 'absoluteDiff' = 'proportionalDiff',
 ) {
-  const range = colorScheme === 'default' ? diffDefaultColors : diffColorBlindColors;
+  const range =
+    colorScheme === 'default' ? diffDefaultColors : diffColorBlindColors;
   const ticksLeft = ticks - ticksRight;
   const totalTicksLeft = totalTicks - totalTicksRight;
 
   // Absolute mode uses the raw delta; scale its color intensity against the larger
   // profile total so the same absolute delta has the same color everywhere.
   // Proportional mode compares each node's share of its respective profile.
-  const diff = diffMode === 'absoluteDiff'
-    ? (ticksRight - ticksLeft) / (Math.max(totalTicksLeft, totalTicksRight) || 1) * 100
-    : totalTicksLeft && totalTicksRight
-      ? (() => {
-          const leftShare = ticksLeft / totalTicksLeft;
-          const rightShare = ticksRight / totalTicksRight;
-          return leftShare ? (rightShare - leftShare) / leftShare * 100 : rightShare ? 100 : 0;
-        })()
-      : 0;
+  const diff =
+    diffMode === 'absoluteDiff'
+      ? ((ticksRight - ticksLeft) /
+          (Math.max(totalTicksLeft, totalTicksRight) || 1)) *
+        100
+      : totalTicksLeft && totalTicksRight
+        ? (() => {
+            const leftShare = ticksLeft / totalTicksLeft;
+            const rightShare = ticksRight / totalTicksRight;
+            return leftShare
+              ? ((rightShare - leftShare) / leftShare) * 100
+              : rightShare
+                ? 100
+                : 0;
+          })()
+        : 0;
 
   // Match d3-scale's piecewise RGB interpolation, including extrapolation for large diffs.
   const [from, to, fraction]: [string, string, number] =
-    diff < 0 ? [range[0], range[1], (diff + 100) / 100] : [range[1], range[2], diff / 100];
+    diff < 0
+      ? [range[0], range[1], (diff + 100) / 100]
+      : [range[1], range[2], diff / 100];
   const a = color(from).toRgb();
   const b = color(to).toRgb();
   const channel = (left: number, right: number) =>
     Math.max(0, Math.min(255, Math.round(left + (right - left) * fraction)));
-  return color({ r: channel(a.r, b.r), g: channel(a.g, b.g), b: channel(a.b, b.b) });
+  return color({
+    r: channel(a.r, b.r),
+    g: channel(a.g, b.g),
+    b: channel(a.b, b.b),
+  });
 }
 
 // const getColors = memoizeOne((theme) => getFilteredColors(colors, theme));

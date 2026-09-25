@@ -27,7 +27,7 @@
   outline: none;
 }
 
-.fg-popover-item[data-active='true'] {
+.fg-popover-item[data-active="true"] {
   background: var(--action-selected);
   color: var(--color-primary-text);
 }

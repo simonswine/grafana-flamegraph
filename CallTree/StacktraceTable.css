@@ -1,25 +1,72 @@
 /* Share the top table's surface, row height, typography, colors and column widths. */
-.fg-stacktrace .fg-tt-table { min-width: 420px; }
-.fg-stacktrace-diff .fg-tt-table { min-width: 540px; }
-.fg-stacktrace .fg-tt-action-header, .fg-stacktrace .fg-tt-action-cell {
+.fg-stacktrace .fg-tt-table {
+  min-width: 420px;
+}
+.fg-stacktrace-diff .fg-tt-table {
+  min-width: 540px;
+}
+.fg-stacktrace .fg-tt-action-header,
+.fg-stacktrace .fg-tt-action-cell {
   width: 20px;
   box-sizing: border-box;
 }
-.fg-stacktrace .fg-tt-action-cell { padding: 2px 0; }
-.fg-stacktrace .fg-tt-symbol-header, .fg-stacktrace .fg-tt-symbol-cell { padding-left: 0; }
-.fg-stacktrace .fg-tt-numeric-header .fg-tt-sort-btn { justify-content: flex-end; }
-.fg-stacktrace .fg-tt-symbol-cell { padding: 0 8px 0 0; }
-.fg-stacktrace-symbol { display: flex; align-items: center; height: 25px; min-width: 0; }
+.fg-stacktrace .fg-tt-action-cell {
+  padding: 2px 0;
+}
+.fg-stacktrace .fg-tt-symbol-header,
+.fg-stacktrace .fg-tt-symbol-cell {
+  padding-left: 0;
+}
+.fg-stacktrace .fg-tt-numeric-header .fg-tt-sort-btn {
+  justify-content: flex-end;
+}
+.fg-stacktrace .fg-tt-symbol-cell {
+  padding: 0 8px 0 0;
+}
+.fg-stacktrace-symbol {
+  display: flex;
+  align-items: center;
+  height: 25px;
+  min-width: 0;
+}
 /* Each level uses 12px instead of the previous 16px indentation. */
-.fg-stacktrace-guide { position: relative; flex: 0 0 12px; height: 25px; }
-.fg-stacktrace-guide-continuation::before, .fg-stacktrace-branch::before {
-  content: ''; position: absolute; left: 5px; top: 0; height: 50%;
+.fg-stacktrace-guide {
+  position: relative;
+  flex: 0 0 12px;
+  height: 25px;
+}
+.fg-stacktrace-guide-continuation::before,
+.fg-stacktrace-branch::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 0;
+  height: 50%;
   border-left: 1px solid var(--border-medium);
 }
-.fg-stacktrace-guide-continuation::before { height: 100%; }
+.fg-stacktrace-guide-continuation::before {
+  height: 100%;
+}
 .fg-stacktrace-branch::after {
-  content: ''; position: absolute; left: 5px; right: 0; top: 50%;
+  content: "";
+  position: absolute;
+  left: 5px;
+  right: 0;
+  top: 50%;
   border-top: 1px solid var(--border-medium);
 }
-.fg-stacktrace-link { border: 0; background: none; cursor: pointer; font: inherit; padding: 4px 0; max-width: calc(100% - 8px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
-.fg-stacktrace-match { background: var(--action-selected); }
+.fg-stacktrace-link {
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  padding: 4px 0;
+  max-width: calc(100% - 8px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+.fg-stacktrace-match {
+  background: var(--action-selected);
+}

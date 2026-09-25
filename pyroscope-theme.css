@@ -82,10 +82,10 @@
 
   /* ── Typography ─────────────────────────────────────────────────────────── */
   --font-sans:
-    'Roboto', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    "Roboto", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
   --font-mono:
-    'Roboto Mono', 'Fira Code', 'Cascadia Code', 'Menlo', 'Consolas', monospace;
+    "Roboto Mono", "Fira Code", "Cascadia Code", "Menlo", "Consolas", monospace;
 
   /* Size scale — anchored at 14 px as the base UI font size */
   --text-2xs: 0.625rem; /* 10 px */
@@ -228,7 +228,7 @@
    Only tokens that change between themes are redeclared here.
    Primitives and theme-invariant values inherit from :root.
 ----------------------------------------------------------------------------- */
-[data-theme='light'] {
+[data-theme="light"] {
   color-scheme: light;
 
   /* ── Backgrounds ────────────────────────────────────────────────────────── */

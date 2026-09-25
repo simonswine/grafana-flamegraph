@@ -6,29 +6,36 @@ import {
   useState,
 } from 'react';
 import color from 'tinycolor2';
-
-import { cssVar, useIsLight } from '../theme';
-
 import {
   BAR_BORDER_WIDTH,
   BAR_TEXT_PADDING_LEFT,
-  MUTE_THRESHOLD,
+  GROUP_STRIP_MARGIN_LEFT,
+  GROUP_STRIP_PADDING,
+  GROUP_STRIP_WIDTH,
+  GROUP_TEXT_OFFSET,
   HIDE_THRESHOLD,
   LABEL_THRESHOLD,
+  MUTE_THRESHOLD,
   PIXELS_PER_LEVEL,
-  GROUP_STRIP_WIDTH,
-  GROUP_STRIP_PADDING,
-  GROUP_STRIP_MARGIN_LEFT,
-  GROUP_TEXT_OFFSET,
 } from '../constants';
-import { type ClickedItemData, ColorScheme, type ColorSchemeDiff, type TextAlign } from '../types';
-
-import { getBarColorByDiff, getBarColorByPackage, getBarColorByValue } from './colors';
+import { cssVar, useIsLight } from '../theme';
 import {
-  type CollapseConfig,
-  type CollapsedMap,
-  type FlameGraphDataContainer,
-  type LevelItem,
+  type ClickedItemData,
+  ColorScheme,
+  type ColorSchemeDiff,
+  type TextAlign,
+} from '../types';
+
+import {
+  getBarColorByDiff,
+  getBarColorByPackage,
+  getBarColorByValue,
+} from './colors';
+import type {
+  CollapseConfig,
+  CollapsedMap,
+  FlameGraphDataContainer,
+  LevelItem,
 } from './dataTransform';
 
 type RenderOptions = {
@@ -238,20 +245,40 @@ function useRenderFunc(
             y,
             textAlign,
             diffMode === 'proportionalDiff' && totalTicksRight !== undefined
-              ? getProportionalLabel(item, totalColorTicks, totalTicksRight) : undefined,
+              ? getProportionalLabel(item, totalColorTicks, totalTicksRight)
+              : undefined,
           );
 
           renderGroupingStrip(ctx, x, y, height, item, collapsedItemConfig);
         } else {
-          renderLabel(ctx, data, finalLabel, item, width, x, y, textAlign,
+          renderLabel(
+            ctx,
+            data,
+            finalLabel,
+            item,
+            width,
+            x,
+            y,
+            textAlign,
             diffMode === 'proportionalDiff' && totalTicksRight !== undefined
-              ? getProportionalLabel(item, totalColorTicks, totalTicksRight) : undefined);
+              ? getProportionalLabel(item, totalColorTicks, totalTicksRight)
+              : undefined,
+          );
         }
       }
     };
 
     return renderFunc;
-  }, [ctx, getBarColor, textAlign, data, collapsedMap, diffMode, totalColorTicks, totalTicksRight]);
+  }, [
+    ctx,
+    getBarColor,
+    textAlign,
+    data,
+    collapsedMap,
+    diffMode,
+    totalColorTicks,
+    totalTicksRight,
+  ]);
 }
 
 /**
@@ -333,11 +360,11 @@ export function walkTree(
     (wrapperWidth * window.devicePixelRatio) /
     totalViewTicks /
     (rangeMax - rangeMin);
-  let collapsedItemRendered: LevelItem | undefined = undefined;
+  let collapsedItemRendered: LevelItem | undefined;
 
   while (stack.length > 0) {
     const { item, levelOffset } = stack.shift()!;
-    let curBarTicks = item.value;
+    const curBarTicks = item.value;
     const muted = curBarTicks * pixelsPerTick <= MUTE_THRESHOLD;
     const width =
       curBarTicks * pixelsPerTick - (muted ? 0 : BAR_BORDER_WIDTH * 2);
@@ -371,7 +398,7 @@ export function walkTree(
       const barX = getBarX(item.start, totalViewTicks, rangeMin, pixelsPerTick);
       const barY = (item.level + levelOffset) * PIXELS_PER_LEVEL;
 
-      let label = data.getLabel(item.itemIndexes[0]);
+      const label = data.getLabel(item.itemIndexes[0]);
       if (isCollapsedItem) {
         collapsedItemRendered = item;
       }
@@ -411,12 +438,21 @@ function useColorFunction(
         return mutedColor;
       }
 
-      const barColor = totalTicksRight !== undefined
-        ? color(getBarColorByDiff(item.value, item.valueRight ?? 0, totalTicks, totalTicksRight,
-            colorScheme === 'diffColorBlind' ? 'diffColorBlind' : 'default', diffMode))
-        : colorScheme === ColorScheme.ValueBased
-          ? getBarColorByValue(item.value, totalTicks, rangeMin, rangeMax)
-          : getBarColorByPackage(label, isLight);
+      const barColor =
+        totalTicksRight !== undefined
+          ? color(
+              getBarColorByDiff(
+                item.value,
+                item.valueRight ?? 0,
+                totalTicks,
+                totalTicksRight,
+                colorScheme === 'diffColorBlind' ? 'diffColorBlind' : 'default',
+                diffMode,
+              ),
+            )
+          : colorScheme === ColorScheme.ValueBased
+            ? getBarColorByValue(item.value, totalTicks, rangeMin, rangeMax)
+            : getBarColorByPackage(label, isLight);
 
       if (matchedLabels) {
         // Means we are searching, we use color for matches and gray the rest
@@ -474,13 +510,17 @@ function useSetupCanvas(
 
 // Renders a text inside the node rectangle. It allows setting alignment of the text left or right which takes effect
 // when text is too long to fit in the rectangle.
-function getProportionalLabel(item: LevelItem, totalTicks: number, totalRight: number): string {
+function getProportionalLabel(
+  item: LevelItem,
+  totalTicks: number,
+  totalRight: number,
+): string {
   const left = item.value - (item.valueRight ?? 0);
   const leftTotal = totalTicks - totalRight;
   const baselineShare = leftTotal ? left / leftTotal : 0;
   const comparisonShare = totalRight ? (item.valueRight ?? 0) / totalRight : 0;
   if (!baselineShare) return comparisonShare ? 'new' : '0.00%';
-  const change = (comparisonShare - baselineShare) / baselineShare * 100;
+  const change = ((comparisonShare - baselineShare) / baselineShare) * 100;
   return `${change > 0 ? '+' : ''}${change.toFixed(2)}%`;
 }
 
@@ -511,7 +551,10 @@ function renderLabel(
 
   // We use the desired alignment only if there is not enough space for the text, otherwise we keep left alignment as
   // that will already show full text.
-  if (ctx.measureText(proportionalLabel ? fullLabel : label).width > spaceForTextInRect) {
+  if (
+    ctx.measureText(proportionalLabel ? fullLabel : label).width >
+    spaceForTextInRect
+  ) {
     // Keep the parenthesized percentage visible on narrow diff bars.
     if (proportionalLabel) fullLabel = `(${proportionalLabel}) ${label}`;
     ctx.textAlign = textAlign;

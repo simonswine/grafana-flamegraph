@@ -1,12 +1,10 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-
-import { Icon, type IconType } from '../Icon';
-
-import { type FlameGraphDataContainer } from '../FlameGraph/dataTransform';
+import type { FlameGraphDataContainer } from '../FlameGraph/dataTransform';
 import { escapeRegex } from '../format';
-import { type TableData, type ColorScheme, type ColorSchemeDiff } from '../types';
-import { useIsLight } from '../theme';
+import { Icon, type IconType } from '../Icon';
 import { getSymbolColor, TableMetricCell } from '../TableMetricCell';
+import { useIsLight } from '../theme';
+import type { ColorScheme, ColorSchemeDiff, TableData } from '../types';
 
 import './FlameGraphTopTableContainer.css';
 
@@ -25,7 +23,13 @@ type Props = {
   onTableSort?: (sort: string) => void;
 };
 
-type SortColumn = 'Symbol' | 'Self' | 'Total' | 'Baseline' | 'Comparison' | 'Diff';
+type SortColumn =
+  | 'Symbol'
+  | 'Self'
+  | 'Total'
+  | 'Baseline'
+  | 'Comparison'
+  | 'Diff';
 type SortDirection = 'asc' | 'desc';
 type SortState = { column: SortColumn; direction: SortDirection };
 
@@ -72,18 +76,33 @@ const FlameGraphTopTableContainer = memo(
       copy.sort((a, b) => {
         if (sort.column === 'Symbol')
           return a.symbol.localeCompare(b.symbol) * dir;
-        const leftTotal = data.getValue(0), rightTotal = data.getValueRight(0);
+        const leftTotal = data.getValue(0),
+          rightTotal = data.getValueRight(0);
         const metric = (row: Row) => {
           const left = row.total - row.totalRight;
           const right = row.totalRight;
           if (sort.column === 'Self') return row.self;
-          if (sort.column === 'Comparison') return diffMode === 'absoluteDiff' ? right : rightTotal ? right / rightTotal : 0;
-          if (sort.column === 'Baseline') return diffMode === 'absoluteDiff' ? left : leftTotal ? left / leftTotal : 0;
+          if (sort.column === 'Comparison')
+            return diffMode === 'absoluteDiff'
+              ? right
+              : rightTotal
+                ? right / rightTotal
+                : 0;
+          if (sort.column === 'Baseline')
+            return diffMode === 'absoluteDiff'
+              ? left
+              : leftTotal
+                ? left / leftTotal
+                : 0;
           if (sort.column === 'Diff') {
             if (diffMode === 'absoluteDiff') return right - left;
             const baseline = leftTotal ? left / leftTotal : 0;
             const comparison = rightTotal ? right / rightTotal : 0;
-            return baseline ? (comparison - baseline) / baseline : comparison ? 1 : 0;
+            return baseline
+              ? (comparison - baseline) / baseline
+              : comparison
+                ? 1
+                : 0;
           }
           return row.total;
         };
@@ -150,7 +169,10 @@ const FlameGraphTopTableContainer = memo(
     const padBottom = (sortedRows.length - endIdx) * ROW_HEIGHT;
 
     return (
-      <div className={`fg-tt-container${data.isDiffFlamegraph() ? ' fg-tt-diff' : ''}`} data-testid="topTable">
+      <div
+        className={`fg-tt-container${data.isDiffFlamegraph() ? ' fg-tt-diff' : ''}`}
+        data-testid="topTable"
+      >
         <div ref={scrollRef} className={'fg-tt-scroll'}>
           <table className={'fg-tt-table'} role="table">
             <thead className={'fg-tt-thead'}>
@@ -167,14 +189,40 @@ const FlameGraphTopTableContainer = memo(
                   onClick={handleSort}
                   className={'fg-tt-symbol-header'}
                 />
-                {data.isDiffFlamegraph() ? (['Baseline', 'Comparison', 'Diff'] as const).map((column) =>
-                  <SortHeader key={column} column={column} active={sort.column === column} direction={sort.direction}
-                    align="right" onClick={handleSort} className={'fg-tt-numeric-header'} />) : <>
-                  <SortHeader column="Self" active={sort.column === 'Self'} direction={sort.direction}
-                    align="right" onClick={handleSort} className={'fg-tt-numeric-header'} />
-                  <SortHeader column="Total" active={sort.column === 'Total'} direction={sort.direction}
-                    align="right" onClick={handleSort} className={'fg-tt-numeric-header'} />
-                </>}
+                {data.isDiffFlamegraph() ? (
+                  (['Baseline', 'Comparison', 'Diff'] as const).map(
+                    (column) => (
+                      <SortHeader
+                        key={column}
+                        column={column}
+                        active={sort.column === column}
+                        direction={sort.direction}
+                        align="right"
+                        onClick={handleSort}
+                        className={'fg-tt-numeric-header'}
+                      />
+                    ),
+                  )
+                ) : (
+                  <>
+                    <SortHeader
+                      column="Self"
+                      active={sort.column === 'Self'}
+                      direction={sort.direction}
+                      align="right"
+                      onClick={handleSort}
+                      className={'fg-tt-numeric-header'}
+                    />
+                    <SortHeader
+                      column="Total"
+                      active={sort.column === 'Total'}
+                      direction={sort.direction}
+                      align="right"
+                      onClick={handleSort}
+                      className={'fg-tt-numeric-header'}
+                    />
+                  </>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -289,8 +337,16 @@ function TableRowInner({
   const totalDisp = data.valueDisplayProcessor(row.total);
   const profileTotal = data.getValue(0);
   const profileRight = data.getValueRight(0);
-  const symbolColor = getSymbolColor(row.symbol, row.total, profileTotal + profileRight,
-    row.totalRight, profileRight, isLight, colorScheme ?? 'packageBased', diffMode);
+  const symbolColor = getSymbolColor(
+    row.symbol,
+    row.total,
+    profileTotal + profileRight,
+    row.totalRight,
+    profileRight,
+    isLight,
+    colorScheme ?? 'packageBased',
+    diffMode,
+  );
 
   const onSandwichClick = useCallback(
     () => onSandwich(isSandwiched ? undefined : row.symbol),
@@ -341,30 +397,96 @@ function TableRowInner({
           {row.symbol}
         </a>
       </td>
-      {data.isDiffFlamegraph() ? (() => {
-        const leftTotal = data.getValue(0), rightTotal = data.getValueRight(0);
-        const baseline = leftTotal ? (row.total - row.totalRight) / leftTotal * 100 : 0;
-        const comparison = rightTotal ? row.totalRight / rightTotal * 100 : 0;
-        const diff = baseline ? (comparison - baseline) / baseline * 100 : 0;
-        if (diffMode === 'absoluteDiff') {
-          const left = row.total - row.totalRight, right = row.totalRight;
-          const delta = right - left;
-          return <><TableMetricCell label="Baseline" value={left} total={leftTotal}
-            display={formatValue(data.valueDisplayProcessor(left))} color={symbolColor} />
-            <TableMetricCell label="Comparison" value={right} total={rightTotal}
-              display={formatValue(data.valueDisplayProcessor(right))} color={symbolColor} />
-            <td className="fg-tt-numeric-cell" style={{ color: delta > 0 ? 'var(--red-300)' : 'var(--green-300)' }}>
-              {delta >= 0 ? '+' : '−'}{formatValue(data.valueDisplayProcessor(Math.abs(delta)))}</td></>;
-        }
-        return <><TableMetricCell label="Baseline" value={row.total - row.totalRight} total={leftTotal}
-          display={`${baseline.toFixed(2)}%`} color={symbolColor} />
-          <TableMetricCell label="Comparison" value={row.totalRight} total={rightTotal}
-            display={`${comparison.toFixed(2)}%`} color={symbolColor} />
-          <td className="fg-tt-numeric-cell" style={{ color: diff > 0 ? 'var(--red-300)' : 'var(--green-300)' }}>{baseline ? `${diff.toFixed(2)}%` : '—'}</td></>;
-      })() : <><TableMetricCell label="Self" value={row.self} total={profileTotal}
-        display={formatValue(selfDisp)} color={symbolColor} />
-      <TableMetricCell label="Total" value={row.total} total={profileTotal}
-        display={formatValue(totalDisp)} color={symbolColor} /></>}
+      {data.isDiffFlamegraph() ? (
+        (() => {
+          const leftTotal = data.getValue(0),
+            rightTotal = data.getValueRight(0);
+          const baseline = leftTotal
+            ? ((row.total - row.totalRight) / leftTotal) * 100
+            : 0;
+          const comparison = rightTotal
+            ? (row.totalRight / rightTotal) * 100
+            : 0;
+          const diff = baseline
+            ? ((comparison - baseline) / baseline) * 100
+            : 0;
+          if (diffMode === 'absoluteDiff') {
+            const left = row.total - row.totalRight,
+              right = row.totalRight;
+            const delta = right - left;
+            return (
+              <>
+                <TableMetricCell
+                  label="Baseline"
+                  value={left}
+                  total={leftTotal}
+                  display={formatValue(data.valueDisplayProcessor(left))}
+                  color={symbolColor}
+                />
+                <TableMetricCell
+                  label="Comparison"
+                  value={right}
+                  total={rightTotal}
+                  display={formatValue(data.valueDisplayProcessor(right))}
+                  color={symbolColor}
+                />
+                <td
+                  className="fg-tt-numeric-cell"
+                  style={{
+                    color: delta > 0 ? 'var(--red-300)' : 'var(--green-300)',
+                  }}
+                >
+                  {delta >= 0 ? '+' : '−'}
+                  {formatValue(data.valueDisplayProcessor(Math.abs(delta)))}
+                </td>
+              </>
+            );
+          }
+          return (
+            <>
+              <TableMetricCell
+                label="Baseline"
+                value={row.total - row.totalRight}
+                total={leftTotal}
+                display={`${baseline.toFixed(2)}%`}
+                color={symbolColor}
+              />
+              <TableMetricCell
+                label="Comparison"
+                value={row.totalRight}
+                total={rightTotal}
+                display={`${comparison.toFixed(2)}%`}
+                color={symbolColor}
+              />
+              <td
+                className="fg-tt-numeric-cell"
+                style={{
+                  color: diff > 0 ? 'var(--red-300)' : 'var(--green-300)',
+                }}
+              >
+                {baseline ? `${diff.toFixed(2)}%` : '—'}
+              </td>
+            </>
+          );
+        })()
+      ) : (
+        <>
+          <TableMetricCell
+            label="Self"
+            value={row.self}
+            total={profileTotal}
+            display={formatValue(selfDisp)}
+            color={symbolColor}
+          />
+          <TableMetricCell
+            label="Total"
+            value={row.total}
+            total={profileTotal}
+            display={formatValue(totalDisp)}
+            color={symbolColor}
+          />
+        </>
+      )}
     </tr>
   );
 }
@@ -435,7 +557,8 @@ export function buildFilteredTable(
         filteredTable[label].total = filteredTable[label].total
           ? filteredTable[label].total + value
           : value;
-        filteredTable[label].totalRight = (filteredTable[label].totalRight ?? 0) + valueRight;
+        filteredTable[label].totalRight =
+          (filteredTable[label].totalRight ?? 0) + valueRight;
       }
     }
 

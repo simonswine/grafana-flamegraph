@@ -1,4 +1,3 @@
-export { default as FlameGraph, type Props } from './FlameGraphContainer';
 export {
   checkFields,
   type DataFrame,
@@ -6,3 +5,4 @@ export {
   FieldType,
   getMessageCheckFieldsResult,
 } from './FlameGraph/dataTransform';
+export { default as FlameGraph, type Props } from './FlameGraphContainer';

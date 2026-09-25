@@ -1,3 +1,4 @@
+import type * as React from 'react';
 import {
   type MouseEvent as ReactMouseEvent,
   useCallback,
@@ -5,28 +6,24 @@ import {
   useRef,
   useState,
 } from 'react';
-import * as React from 'react';
-
-import { useMeasure } from '../hooks';
-
 import { PIXELS_PER_LEVEL } from '../constants';
-import {
-  type ClickedItemData,
-  type ColorScheme,
-  type ColorSchemeDiff,
-  type SelectedView,
-  type TextAlign,
+import { useMeasure } from '../hooks';
+import type {
+  ClickedItemData,
+  ColorScheme,
+  ColorSchemeDiff,
+  SelectedView,
+  TextAlign,
 } from '../types';
-
+import type {
+  CollapsedMap,
+  FlameGraphDataContainer,
+  LevelItem,
+} from './dataTransform';
 import FlameGraphContextMenu, {
   type GetExtraContextMenuButtonsFunction,
 } from './FlameGraphContextMenu';
 import FlameGraphTooltip from './FlameGraphTooltip';
-import {
-  type CollapsedMap,
-  type FlameGraphDataContainer,
-  type LevelItem,
-} from './dataTransform';
 import { getBarX, useFlameRender } from './rendering';
 
 import './FlameGraphCanvas.css';
@@ -313,7 +310,7 @@ export const convertPixelCoordinatesToBarCoordinates = (
   const levelIndex = Math.floor(
     pos.y / (PIXELS_PER_LEVEL / window.devicePixelRatio),
   );
-  let found = undefined;
+  let found;
 
   while (next) {
     const node: LevelItem = next;

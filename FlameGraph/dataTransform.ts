@@ -1,4 +1,4 @@
-import { formatByUnit, type Formatted } from '../format';
+import { type Formatted, formatByUnit } from '../format';
 import { SampleUnit } from '../types';
 
 import { mergeParentSubtrees, mergeSubtrees } from './treeTransforms';
@@ -64,7 +64,7 @@ export function nestedSetToLevels(
   const levels: LevelItem[][] = [];
   let offset = 0;
 
-  let parent: LevelItem | undefined = undefined;
+  let parent: LevelItem | undefined;
   const uniqueLabels: Record<string, LevelItem[]> = Object.create(null);
 
   for (let i = 0; i < container.data.length; i++) {
@@ -77,8 +77,7 @@ export function nestedSetToLevels(
       // We are going down a level or staying at the same level, so we are adding a sibling to the last item in a level.
       // So we have to compute the correct offset based on the last sibling.
       const lastSibling = levels[currentLevel][levels[currentLevel].length - 1];
-      offset =
-        lastSibling.start + lastSibling.value;
+      offset = lastSibling.start + lastSibling.value;
       // we assume there is always a single root node so lastSibling should always have a parent.
       // Also it has to have the same parent because of how the items are ordered.
       parent = lastSibling.parents![0];
@@ -87,7 +86,9 @@ export function nestedSetToLevels(
     const newItem: LevelItem = {
       itemIndexes: [i],
       value: container.getValue(i) + container.getValueRight(i),
-      valueRight: container.isDiffFlamegraph() ? container.getValueRight(i) : undefined,
+      valueRight: container.isDiffFlamegraph()
+        ? container.getValueRight(i)
+        : undefined,
       start: offset,
       parents: parent && [parent],
       children: [],
@@ -170,7 +171,8 @@ export class CollapsedMap {
       const current = pending.pop()!;
       if (seen.has(current)) continue;
       seen.add(current);
-      if (result.get(current)?.collapsed) result = result.setCollapsedStatus(current, false);
+      if (result.get(current)?.collapsed)
+        result = result.setCollapsedStatus(current, false);
       pending.push(...(current.parents ?? []));
     }
     return result;
@@ -357,10 +359,13 @@ export class FlameGraphDataContainer {
     this.valueRightField = data.fields.find((f) => f.name === 'valueRight');
     this.selfRightField = data.fields.find((f) => f.name === 'selfRight');
     if (Boolean(this.valueRightField) !== Boolean(this.selfRightField)) {
-      throw new Error('Diff profiles require both valueRight and selfRight fields.');
+      throw new Error(
+        'Diff profiles require both valueRight and selfRight fields.',
+      );
     }
     for (const field of [this.valueRightField, this.selfRightField]) {
-      if (field && field.type !== FieldType.number) throw new Error(`${field.name} must be numeric.`);
+      if (field && field.type !== FieldType.number)
+        throw new Error(`${field.name} must be numeric.`);
     }
 
     const enumConfig = this.labelField?.config?.type?.enum;
