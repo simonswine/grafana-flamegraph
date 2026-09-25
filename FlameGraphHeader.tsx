@@ -5,22 +5,17 @@ import { Icon, type IconType } from './Icon';
 
 import { ColorSchemeButton } from './ColorSchemeButton';
 import { type CollapsedMap } from './FlameGraph/dataTransform';
-import { MIN_WIDTH_TO_SHOW_BOTH_TOPTABLE_AND_FLAMEGRAPH } from './constants';
 import { cx } from './cx';
 import { useDebounce, usePrevious } from './hooks';
-import { type ColorScheme, type ColorSchemeDiff, SelectedView, type TextAlign } from './types';
+import { type ColorScheme, type ColorSchemeDiff, type TextAlign } from './types';
 
 import './FlameGraphHeader.css';
 
 type Props = {
   search: string;
   setSearch: (search: string) => void;
-  selectedView: SelectedView;
-  hideViewSelector?: boolean;
   viewMode?: 'single' | 'dual';
   setViewMode?: (mode: 'single' | 'dual') => void;
-  setSelectedView: (view: SelectedView) => void;
-  containerWidth: number;
   onReset: () => void;
   textAlign: TextAlign;
   onTextAlignChange: (align: TextAlign) => void;
@@ -44,9 +39,6 @@ const FlameGraphHeader = (props: Props) => {
   );
 
   const {
-    selectedView,
-    setSelectedView,
-    containerWidth,
     onReset,
     textAlign,
     onTextAlignChange,
@@ -55,13 +47,9 @@ const FlameGraphHeader = (props: Props) => {
     onColorSchemeChange,
     stickyHeader,
     extraHeaderElements,
-    vertical,
     setCollapsedMap,
     collapsedMap,
   } = props;
-
-  const tableOnly = selectedView === SelectedView.TopTable;
-  const viewOptions = getViewOptions(containerWidth, vertical);
 
   return (
     <div className={cx('fg-header', { 'fg-header-sticky': stickyHeader })}>
@@ -116,14 +104,14 @@ const FlameGraphHeader = (props: Props) => {
             <IconBtn
               icon="angle-double-down"
               label="Expand all groups"
-              disabled={tableOnly || props.disableCollapsing || collapsedMap.size() === 0}
+              disabled={props.disableCollapsing || collapsedMap.size() === 0}
               onClick={() => setCollapsedMap(collapsedMap.setAllCollapsedStatus(false))}
               grouped
             />
             <IconBtn
               icon="angle-double-up"
               label="Collapse all groups"
-              disabled={tableOnly || props.disableCollapsing || collapsedMap.size() === 0}
+              disabled={props.disableCollapsing || collapsedMap.size() === 0}
               onClick={() => setCollapsedMap(collapsedMap.setAllCollapsedStatus(true))}
               grouped
             />
@@ -135,23 +123,12 @@ const FlameGraphHeader = (props: Props) => {
             name="text-align"
             value={textAlign}
             onChange={onTextAlignChange}
-            disabled={tableOnly}
             options={[
               { value: 'left', title: 'Align clipped text left', icon: 'align-left' },
               { value: 'right', title: 'Align clipped text right', icon: 'align-right' },
             ]}
           />
         </div>
-        {!props.hideViewSelector && <RadioGroup
-          name="selected-view"
-          value={selectedView}
-          onChange={setSelectedView}
-          options={viewOptions.map((o) => ({
-            value: o.value,
-            title: o.label,
-            label: o.label,
-          }))}
-        />}
         {extraHeaderElements && (
           <div className="fg-header-extra-elements">{extraHeaderElements}</div>
         )}
@@ -247,20 +224,6 @@ function RadioGroup<T extends string>({
       })}
     </div>
   );
-}
-
-function getViewOptions(
-  width: number,
-  vertical?: boolean,
-): Array<{ value: SelectedView; label: string }> {
-  const options: Array<{ value: SelectedView; label: string }> = [
-    { value: SelectedView.TopTable, label: 'Top Table' },
-    { value: SelectedView.FlameGraph, label: 'Flame Graph' },
-  ];
-  if (width >= MIN_WIDTH_TO_SHOW_BOTH_TOPTABLE_AND_FLAMEGRAPH || vertical) {
-    options.push({ value: SelectedView.Both, label: 'Both' });
-  }
-  return options;
 }
 
 function useSearchInput(

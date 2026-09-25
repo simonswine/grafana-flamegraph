@@ -13,13 +13,12 @@ import { escapeRegex } from './format';
 import FlameGraphHeader from './FlameGraphHeader';
 import FlameGraphTopTableContainer from './TopTable/FlameGraphTopTableContainer';
 import { StacktraceTable } from './CallTree/StacktraceTable';
-import { MIN_WIDTH_TO_SHOW_BOTH_TOPTABLE_AND_FLAMEGRAPH } from './constants';
 
 import './pyroscope-theme.css';
 import './FlameGraphContainer.css';
 import './Layout.css';
 import { useColorScheme, useMeasure } from './hooks';
-import { type ClickedItemData, ColorScheme, SelectedView, type TextAlign } from './types';
+import { type ClickedItemData, ColorScheme, type TextAlign } from './types';
 
 type DataMode = 'baseline' | 'comparison' | 'proportionalDiff' | 'absoluteDiff';
 
@@ -109,7 +108,6 @@ const FlameGraphContainer = ({
   const [singleDataMode, setSingleDataMode] = useState<DataMode>('proportionalDiff');
   const [leftDataMode, setLeftDataMode] = useState<DataMode>('baseline');
   const [rightDataMode, setRightDataMode] = useState<DataMode>('comparison');
-  const [selectedView, setSelectedView] = useState<SelectedView>(SelectedView.Both);
   const [sizeRef, { width: containerWidth }] = useMeasure<HTMLDivElement>();
   const [textAlign, setTextAlign] = useState<TextAlign>('left');
   // This is a label of the item because in sandwich view we group all items by label and present a merged graph
@@ -158,18 +156,6 @@ const FlameGraphContainer = ({
   const visibleModes = viewMode === 'single' ? [singleDataMode] : [leftDataMode, rightDataMode];
   const showingDiff = isDiffData && visibleModes.some((mode) => mode === 'proportionalDiff' || mode === 'absoluteDiff');
   const matchedLabels = useLabelSearch(search, dataContainer);
-
-  // If user resizes window with both as the selected view
-  useEffect(() => {
-    if (
-      containerWidth > 0 &&
-      containerWidth < MIN_WIDTH_TO_SHOW_BOTH_TOPTABLE_AND_FLAMEGRAPH &&
-      selectedView === SelectedView.Both &&
-      !vertical
-    ) {
-      setSelectedView(SelectedView.FlameGraph);
-    }
-  }, [selectedView, setSelectedView, containerWidth, vertical]);
 
   const resetFocus = useCallback(() => {
     setFocusedItemData(undefined);
@@ -284,7 +270,6 @@ const FlameGraphContainer = ({
       showFlameGraphOnly={showFlameGraphOnly}
       collapsing={!disableCollapsing}
       getExtraContextMenuButtons={getExtraContextMenuButtons}
-      selectedView={selectedView}
       search={search}
       collapsedMap={(collapsedMaps[mode] ?? paneData.getCollapsedMap()).expandMatchingLabels(paneData, matchedLabels)}
       setCollapsedMap={(map) => setCollapsedMaps((previous) => ({ ...previous, [mode]: map }))}
@@ -347,9 +332,6 @@ const FlameGraphContainer = ({
         <FlameGraphHeader
           search={search}
           setSearch={setSearch}
-          selectedView={selectedView}
-          setSelectedView={setSelectedView}
-          hideViewSelector
           viewMode={viewMode}
           setViewMode={setViewMode}
           containerWidth={containerWidth}
