@@ -94,8 +94,8 @@ const FlameGraphHeader = (props: Props) => {
         {props.viewMode && props.setViewMode && <div className="fg-layout-picker fg-header-spacing-right">
           <span>Layout</span>
           <div className="fg-segmented" role="group" aria-label="Layout">
-            <button type="button" aria-pressed={props.viewMode === 'single'} onClick={() => props.setViewMode?.('single')}>Single</button>
-            <button type="button" aria-pressed={props.viewMode === 'dual'} onClick={() => props.setViewMode?.('dual')}>Dual</button>
+            <button type="button" title="Show one visualization pane" aria-pressed={props.viewMode === 'single'} onClick={() => props.setViewMode?.('single')}>Single</button>
+            <button type="button" title="Show two independently configured visualization panes" aria-pressed={props.viewMode === 'dual'} onClick={() => props.setViewMode?.('dual')}>Dual</button>
           </div>
         </div>}
         <div className="fg-header-control fg-header-spacing-right">

@@ -302,14 +302,14 @@ const FlameGraphContainer = ({
       <span>Visualization</span>
       <div className="fg-segmented" role="group" aria-label={`${position} pane view`}>
         {([
-          ['flameGraph', 'Flame graph'],
-          ['topTable', 'Top table'],
-          ['callTree', 'Call tree'],
-        ] as const).map(([value, title]) =>
-          <button key={value} type="button" aria-pressed={view === value} onClick={() => {
+          ['flameGraph', 'Flame graph', 'Show the profile as a flame graph'],
+          ['topTable', 'Top table', 'Show functions ranked by their sample values'],
+          ['callTree', 'Call tree', 'Show the profile as a stack trace tree'],
+        ] as const).map(([value, label, tooltip]) =>
+          <button key={value} type="button" title={tooltip} aria-pressed={view === value} onClick={() => {
             select(value);
             onViewSelected?.(value);
-          }}>{title}</button>
+          }}>{label}</button>
         )}
       </div>
     </div>
@@ -320,7 +320,12 @@ const FlameGraphContainer = ({
       <span>Data</span>
       <div className="fg-segmented" role="group" aria-label={`${position} pane data`}>
         {(['baseline', 'comparison', 'proportionalDiff', 'absoluteDiff'] as const).map((value) =>
-          <button key={value} type="button" aria-pressed={mode === value} onClick={() => { select(value); resetFocus(); }}>
+          <button key={value} type="button" title={{
+            baseline: 'Show the baseline profile',
+            comparison: 'Show the comparison profile',
+            proportionalDiff: 'Compare each function’s share of its profile',
+            absoluteDiff: 'Compare raw sample counts (comparison minus baseline)',
+          }[value]} aria-pressed={mode === value} onClick={() => { select(value); resetFocus(); }}>
             {{ baseline: 'Baseline', comparison: 'Comparison', proportionalDiff: 'Proportional diff', absoluteDiff: 'Absolute diff' }[value]}
           </button>)}
       </div>
