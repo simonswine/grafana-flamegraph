@@ -254,6 +254,8 @@ const FlameGraphCanvas = ({
             setClickedItemData(undefined);
           }}
           onItemFocus={() => {
+            const expanded = collapsedMap.expandForFocus(clickedItemData.item);
+            if (expanded !== collapsedMap) setCollapsedMap(expanded);
             setRangeMin(clickedItemData.item.start / totalViewTicks);
             setRangeMax(
               (clickedItemData.item.start + clickedItemData.item.value) /

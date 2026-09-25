@@ -161,6 +161,33 @@ export class CollapsedMap {
     return new CollapsedMap(newMap);
   }
 
+  /** Reveal a focused node by expanding its group and every collapsed ancestor group. */
+  expandForFocus(item: LevelItem) {
+    let result: CollapsedMap = this;
+    const pending = [item];
+    const seen = new Set<LevelItem>();
+    while (pending.length) {
+      const current = pending.pop()!;
+      if (seen.has(current)) continue;
+      seen.add(current);
+      if (result.get(current)?.collapsed) result = result.setCollapsedStatus(current, false);
+      pending.push(...(current.parents ?? []));
+    }
+    return result;
+  }
+
+  /** Keep search hits visible without changing the user's saved collapse state. */
+  expandMatchingLabels(data: FlameGraphDataContainer, labels?: Set<string>) {
+    if (!labels?.size) return this;
+    let result: CollapsedMap = this;
+    for (const label of labels) {
+      for (const item of data.getNodesWithLabel(label) ?? []) {
+        result = result.expandForFocus(item);
+      }
+    }
+    return result;
+  }
+
   setAllCollapsedStatus(collapsed: boolean) {
     const newMap = new Map(this.map);
     for (const item of this.map.keys()) {
