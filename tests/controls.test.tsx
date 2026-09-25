@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import FlameGraphContainer from '../FlameGraphContainer';
 import { FieldType, type DataFrame, type FlameGraphDataContainer } from '../FlameGraph/dataTransform';
@@ -42,6 +42,10 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 it('selects data independently in both panes', async () => {
   const user = userEvent.setup();
   render(<FlameGraphContainer data={data} />);
+  const layout = screen.getByRole('group', { name: 'Layout' });
+  expect(layout.closest('.fg-header')).toBeTruthy();
+  expect(screen.getByText('Colors').closest('.fg-header')?.querySelector('.fg-cs-button')).toBeTruthy();
+  expect(screen.getByText('Grouping').closest('.fg-header')?.querySelector('.fg-header-btn-group')).toBeTruthy();
   const left = screen.getByRole('group', { name: 'Left pane data' });
   const right = screen.getByRole('group', { name: 'Right pane data' });
   expect(within(left).getByRole('button', { name: 'Baseline' }).getAttribute('aria-pressed')).toBe('true');
@@ -85,6 +89,32 @@ it('color controls use the regular palette for baseline/comparison and diff pale
   expect(await screen.findByRole('menuitem', { name: 'Diff (color blind)' })).toBeTruthy();
   await user.click(screen.getByRole('menuitem', { name: 'Diff (color blind)' }));
   expect(screen.getAllByTestId('graph').map((graph) => graph.getAttribute('data-scheme'))).toEqual(['valueBased', 'diffColorBlind']);
+});
+
+it('changes flamegraph colors in single layout for both regular and diff profiles', async () => {
+  const user = userEvent.setup();
+  const regular = { ...data, fields: data.fields.filter((field) => !field.name.endsWith('Right')) };
+  const { rerender } = render(<FlameGraphContainer data={regular} initialViewMode="single" />);
+  expect(screen.getByTestId('graph').getAttribute('data-scheme')).toBe('packageBased');
+  await user.click(screen.getByRole('button', { name: 'Change color scheme' }));
+  await user.click(await screen.findByRole('menuitem', { name: 'By value' }));
+  expect(screen.getByTestId('graph').getAttribute('data-scheme')).toBe('valueBased');
+
+  rerender(<FlameGraphContainer data={data} initialViewMode="single" />);
+  await user.click(screen.getByRole('button', { name: 'Change color scheme' }));
+  await user.click(await screen.findByRole('menuitem', { name: 'Diff (color blind)' }));
+  expect(screen.getByTestId('graph').getAttribute('data-scheme')).toBe('diffColorBlind');
+});
+
+it('reveals matches inside collapsed groups and restores collapse when search clears', async () => {
+  const user = userEvent.setup();
+  render(<FlameGraphContainer data={data} />);
+  expect(screen.getByTestId('graph').getAttribute('data-collapsed')).toBe('yes');
+  const search = screen.getByPlaceholderText('Search...');
+  await user.type(search, 'a.long.name');
+  await waitFor(() => expect(screen.getByTestId('graph').getAttribute('data-collapsed')).toBe('no'));
+  await user.clear(search);
+  await waitFor(() => expect(screen.getByTestId('graph').getAttribute('data-collapsed')).toBe('yes'));
 });
 
 it('disables group controls when no collapsible groups exist', () => {

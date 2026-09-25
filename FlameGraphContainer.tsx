@@ -260,6 +260,8 @@ const FlameGraphContainer = ({
   const activeCollapsedMap = visibleModes.map((mode) => collapsedMaps[mode] ?? containers![mode].getCollapsedMap())
     .find((map) => map.size() > 0) ?? dataContainer.getCollapsedMap();
 
+  const schemeFor = (mode: DataMode) => containers![mode].isDiffFlamegraph() ? colorScheme : regularColorScheme;
+
   const flameGraph = (mode: DataMode) => {
     const paneData = containers![mode];
     return <FlameGraph
@@ -277,14 +279,14 @@ const FlameGraphContainer = ({
       onSandwich={onSandwich}
       onFocusPillClick={resetFocus}
       onSandwichPillClick={resetSandwich}
-      colorScheme={mode === 'proportionalDiff' || mode === 'absoluteDiff' ? colorScheme : regularColorScheme}
+      colorScheme={schemeFor(mode)}
       diffMode={mode === 'absoluteDiff' ? mode : 'proportionalDiff'}
       showFlameGraphOnly={showFlameGraphOnly}
       collapsing={!disableCollapsing}
       getExtraContextMenuButtons={getExtraContextMenuButtons}
       selectedView={selectedView}
       search={search}
-      collapsedMap={collapsedMaps[mode] ?? paneData.getCollapsedMap()}
+      collapsedMap={(collapsedMaps[mode] ?? paneData.getCollapsedMap()).expandMatchingLabels(paneData, matchedLabels)}
       setCollapsedMap={(map) => setCollapsedMaps((previous) => ({ ...previous, [mode]: map }))}
     />;
   };
@@ -293,6 +295,7 @@ const FlameGraphContainer = ({
     <FlameGraphTopTableContainer
       data={containers![mode]}
       diffMode={mode === 'absoluteDiff' ? mode : 'proportionalDiff'}
+      colorScheme={schemeFor(mode)}
       onSymbolClick={onSymbolClick}
       search={search}
       matchedLabels={matchedLabels}
@@ -305,16 +308,18 @@ const FlameGraphContainer = ({
 
   const pane = (view: typeof singleView, mode: DataMode) => view === 'flameGraph' ? flameGraph(mode) : view === 'topTable'
     ? <div className="fg-table-container">{table(mode)}</div>
-    : <StacktraceTable data={containers![mode]} diffMode={mode === 'absoluteDiff' ? mode : 'proportionalDiff'} search={search} onSymbolClick={onSymbolClick} />;
+    : <StacktraceTable data={containers![mode]} diffMode={mode === 'absoluteDiff' ? mode : 'proportionalDiff'}
+      colorScheme={schemeFor(mode)}
+      search={search} onSymbolClick={onSymbolClick} />;
 
   const viewPicker = (view: typeof singleView, position: 'View' | 'Left' | 'Right' | 'Top' | 'Bottom', select: (value: typeof singleView) => void) => (
     <div className="fg-view-picker">
-      <span><span aria-hidden="true">👁️</span> {position}</span>
+      <span>Visualization</span>
       <div className="fg-segmented" role="group" aria-label={`${position} pane view`}>
         {([
           ['flameGraph', 'Flame graph'],
           ['topTable', 'Top table'],
-          ['callTree', 'Stacktrace table'],
+          ['callTree', 'Call tree'],
         ] as const).map(([value, title]) =>
           <button key={value} type="button" aria-pressed={view === value} onClick={() => {
             select(value);
@@ -345,6 +350,8 @@ const FlameGraphContainer = ({
           selectedView={selectedView}
           setSelectedView={setSelectedView}
           hideViewSelector
+          viewMode={viewMode}
+          setViewMode={setViewMode}
           containerWidth={containerWidth}
           onReset={() => {
             resetFocus();
@@ -381,13 +388,6 @@ const FlameGraphContainer = ({
         />
       )}
 
-      {!showFlameGraphOnly && <div className="fg-layout-controls">
-        <div role="group" aria-label="Layout">
-          <button type="button" aria-pressed={viewMode === 'single'} onClick={() => setViewMode('single')}>Single</button>
-          <button type="button" aria-pressed={viewMode === 'dual'} onClick={() => setViewMode('dual')}>Dual</button>
-        </div>
-
-      </div>}
       <div className="fg-body">{showFlameGraphOnly ? flameGraph(singleDataMode) : viewMode === 'single' ?
         <div className="fg-pane-with-picker">
           <div className="fg-pane-controls">{viewPicker(singleView, 'View', setSingleView)}

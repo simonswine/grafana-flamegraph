@@ -1,19 +1,21 @@
-.fg-layout-controls, .fg-view-picker, .fg-data-picker { display: flex; align-items: center; gap: 8px; color: var(--text-primary); font-size: var(--text-sm); }
-.fg-layout-controls > div, .fg-segmented {  display: inline-flex; }
-.fg-layout-controls button, .fg-view-picker button, .fg-data-picker button { background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-medium); padding: 5px 10px; cursor: pointer; font: inherit; }
-.fg-layout-controls button:hover, .fg-view-picker button:hover, .fg-data-picker button:hover { background: var(--action-hover); }
-.fg-layout-controls button:focus-visible, .fg-view-picker button:focus-visible, .fg-data-picker button:focus-visible { outline: 2px solid var(--action-focus); outline-offset: 2px; }
-.fg-layout-controls button[aria-pressed="true"], .fg-view-picker button[aria-pressed="true"], .fg-data-picker button[aria-pressed="true"] { background: var(--action-selected); color: var(--color-primary-text); border-color: var(--color-primary-border); }
-.fg-layout-controls > div:first-child button:first-child, .fg-segmented button:first-child { border-radius: var(--radius-md) 0 0 var(--radius-md); }
-.fg-layout-controls > div:first-child button:last-child, .fg-segmented button:last-child { border-radius: 0 var(--radius-md) var(--radius-md) 0; }
-.fg-layout-controls > div:first-child button + button, .fg-segmented button + button { margin-left: -1px; }
-.fg-pane-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; flex: none; }
-.fg-view-picker, .fg-data-picker { flex-wrap: wrap; flex: none; }
+.fg-pane-controls { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 8px 12px; color: var(--text-primary); font-size: var(--text-sm); }
+.fg-layout-picker, .fg-view-picker, .fg-data-picker { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
+.fg-layout-picker > span, .fg-view-picker > span, .fg-data-picker > span { color: var(--text-secondary); font-size: var(--text-xs); font-weight: var(--weight-medium); }
+.fg-segmented { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--border-medium); border-radius: var(--radius-md); background: var(--bg-primary); max-width: 100%; }
+.fg-segmented button { background: transparent; color: var(--text-secondary); border: 0; border-radius: calc(var(--radius-md) - 2px); height: 28px; padding: 0 10px; cursor: pointer; font: inherit; white-space: nowrap; }
+.fg-segmented button:hover { background: var(--action-hover); color: var(--text-primary); }
+.fg-segmented button:focus-visible { outline: 2px solid var(--action-focus); outline-offset: 1px; }
+.fg-segmented button[aria-pressed="true"] { background: var(--bg-secondary); color: var(--text-primary); font-weight: var(--weight-medium); }
+.fg-pane-controls { flex: none; }
 .fg-pane-with-picker, .fg-dual-pane { display: flex; flex-direction: column; min-width: 0; min-height: 0; gap: 8px; }
 .fg-pane-with-picker { height: 100%; }
 .fg-pane-content { flex: 1 1 0; min-height: 0; overflow: auto; }
 .fg-dual, .fg-dual-vertical { display: flex; gap: 8px; height: 100%; min-height: 0; }
 .fg-dual-vertical { flex-direction: column; }
+.fg-dual-vertical > .fg-dual-pane + .fg-dual-pane {
+  border-top: 1px solid var(--border-medium);
+  padding-top: 8px;
+}
 .fg-dual-pane { flex: 1 1 0; overflow: hidden; }
 .fg-pane-content .fg-table-container { height: 100%; }
 .fg-pane-content .fg-stacktrace { min-height: 0; max-height: none; }

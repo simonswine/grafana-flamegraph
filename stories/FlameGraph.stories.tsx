@@ -26,7 +26,13 @@ const meta = {
   title: 'FlameGraph',
   component: FlameGraphContainer,
   args: { data },
-  decorators: [(Story) => <div style={{ width: '100%', height: 600, background: 'var(--bg-primary)', padding: 16, boxSizing: 'border-box' }}><Story /></div>],
+  decorators: [(Story, context) => <div style={{
+    width: '100%',
+    // In the vertical story, keep both panes in the Storybook viewport instead
+    // of letting a fixed-height table push the flame graph below the fold.
+    height: context.args.vertical ? 'calc(100vh - 24px)' : 600,
+    background: 'var(--bg-primary)', padding: 16, boxSizing: 'border-box',
+  }}><Story /></div>],
 } satisfies Meta<typeof FlameGraphContainer>;
 
 export default meta;

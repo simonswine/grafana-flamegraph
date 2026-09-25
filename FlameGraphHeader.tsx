@@ -17,6 +17,8 @@ type Props = {
   setSearch: (search: string) => void;
   selectedView: SelectedView;
   hideViewSelector?: boolean;
+  viewMode?: 'single' | 'dual';
+  setViewMode?: (mode: 'single' | 'dual') => void;
   setSelectedView: (view: SelectedView) => void;
   containerWidth: number;
   onReset: () => void;
@@ -97,38 +99,49 @@ const FlameGraphHeader = (props: Props) => {
             onClick={onReset}
           />
         )}
-        <ColorSchemeButton value={colorScheme} onChange={onColorSchemeChange} isDiffMode={props.isDiffMode} />
-        <div className={cx('fg-header-btn-group', 'fg-header-spacing-right')}>
-          <IconBtn
-            icon="angle-double-down"
-            label="Expand all groups"
-            disabled={tableOnly || props.disableCollapsing || collapsedMap.size() === 0}
-            onClick={() =>
-              setCollapsedMap(collapsedMap.setAllCollapsedStatus(false))
-            }
-            grouped
-          />
-          <IconBtn
-            icon="angle-double-up"
-            label="Collapse all groups"
-            disabled={tableOnly || props.disableCollapsing || collapsedMap.size() === 0}
-            onClick={() =>
-              setCollapsedMap(collapsedMap.setAllCollapsedStatus(true))
-            }
-            grouped
+        <div className="fg-header-control fg-header-spacing-right">
+          <span>Colors</span>
+          <ColorSchemeButton value={colorScheme} onChange={onColorSchemeChange} isDiffMode={props.isDiffMode} />
+        </div>
+        {props.viewMode && props.setViewMode && <div className="fg-layout-picker fg-header-spacing-right">
+          <span>Layout</span>
+          <div className="fg-segmented" role="group" aria-label="Layout">
+            <button type="button" aria-pressed={props.viewMode === 'single'} onClick={() => props.setViewMode?.('single')}>Single</button>
+            <button type="button" aria-pressed={props.viewMode === 'dual'} onClick={() => props.setViewMode?.('dual')}>Dual</button>
+          </div>
+        </div>}
+        <div className="fg-header-control fg-header-spacing-right">
+          <span>Grouping</span>
+          <div className="fg-header-btn-group">
+            <IconBtn
+              icon="angle-double-down"
+              label="Expand all groups"
+              disabled={tableOnly || props.disableCollapsing || collapsedMap.size() === 0}
+              onClick={() => setCollapsedMap(collapsedMap.setAllCollapsedStatus(false))}
+              grouped
+            />
+            <IconBtn
+              icon="angle-double-up"
+              label="Collapse all groups"
+              disabled={tableOnly || props.disableCollapsing || collapsedMap.size() === 0}
+              onClick={() => setCollapsedMap(collapsedMap.setAllCollapsedStatus(true))}
+              grouped
+            />
+          </div>
+        </div>
+        <div className="fg-header-radio-control fg-header-spacing-right">
+          <span>Text alignment</span>
+          <RadioGroup
+            name="text-align"
+            value={textAlign}
+            onChange={onTextAlignChange}
+            disabled={tableOnly}
+            options={[
+              { value: 'left', title: 'Align clipped text left', icon: 'align-left' },
+              { value: 'right', title: 'Align clipped text right', icon: 'align-right' },
+            ]}
           />
         </div>
-        <RadioGroup
-          name="text-align"
-          value={textAlign}
-          onChange={onTextAlignChange}
-          disabled={tableOnly}
-          className="fg-header-spacing-right"
-          options={[
-            { value: 'left', title: 'Align clipped text left', icon: 'align-left' },
-            { value: 'right', title: 'Align clipped text right', icon: 'align-right' },
-          ]}
-        />
         {!props.hideViewSelector && <RadioGroup
           name="selected-view"
           value={selectedView}
