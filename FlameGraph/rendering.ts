@@ -21,9 +21,9 @@ import {
   GROUP_STRIP_MARGIN_LEFT,
   GROUP_TEXT_OFFSET,
 } from '../constants';
-import { type ClickedItemData, ColorScheme, type TextAlign } from '../types';
+import { type ClickedItemData, ColorScheme, type ColorSchemeDiff, type TextAlign } from '../types';
 
-import { getBarColorByPackage, getBarColorByValue } from './colors';
+import { getBarColorByDiff, getBarColorByPackage, getBarColorByValue } from './colors';
 import {
   type CollapseConfig,
   type CollapsedMap,
@@ -53,7 +53,9 @@ type RenderOptions = {
   // Total ticks that will be used for computing colors; not affected by sandwich
   // or focus view, so colors stay stable when zooming in.
   totalColorTicks: number;
-  colorScheme: ColorScheme;
+  totalTicksRight?: number;
+  diffMode?: 'proportionalDiff' | 'absoluteDiff';
+  colorScheme: ColorScheme | ColorSchemeDiff;
   focusedItemData?: ClickedItemData;
   collapsedMap: CollapsedMap;
 };
@@ -72,6 +74,8 @@ export function useFlameRender(options: RenderOptions) {
     textAlign,
     totalViewTicks,
     totalColorTicks,
+    totalTicksRight,
+    diffMode,
     colorScheme,
     focusedItemData,
     collapsedMap,
@@ -92,6 +96,8 @@ export function useFlameRender(options: RenderOptions) {
 
   const getBarColor = useColorFunction(
     totalColorTicks,
+    totalTicksRight,
+    diffMode,
     colorScheme,
     isLight,
     mutedColor,
@@ -107,6 +113,9 @@ export function useFlameRender(options: RenderOptions) {
     getBarColor,
     textAlign,
     collapsedMap,
+    diffMode,
+    totalColorTicks,
+    totalTicksRight,
   );
 
   useEffect(() => {
@@ -192,6 +201,9 @@ function useRenderFunc(
   getBarColor: (item: LevelItem, label: string, muted: boolean) => string,
   textAlign: TextAlign,
   collapsedMap: CollapsedMap,
+  diffMode: 'proportionalDiff' | 'absoluteDiff' | undefined,
+  totalColorTicks: number,
+  totalTicksRight: number | undefined,
 ) {
   return useMemo(() => {
     if (!ctx) {
@@ -225,17 +237,21 @@ function useRenderFunc(
               : x,
             y,
             textAlign,
+            diffMode === 'proportionalDiff' && totalTicksRight !== undefined
+              ? getProportionalLabel(item, totalColorTicks, totalTicksRight) : undefined,
           );
 
           renderGroupingStrip(ctx, x, y, height, item, collapsedItemConfig);
         } else {
-          renderLabel(ctx, data, finalLabel, item, width, x, y, textAlign);
+          renderLabel(ctx, data, finalLabel, item, width, x, y, textAlign,
+            diffMode === 'proportionalDiff' && totalTicksRight !== undefined
+              ? getProportionalLabel(item, totalColorTicks, totalTicksRight) : undefined);
         }
       }
     };
 
     return renderFunc;
-  }, [ctx, getBarColor, textAlign, data, collapsedMap]);
+  }, [ctx, getBarColor, textAlign, data, collapsedMap, diffMode, totalColorTicks, totalTicksRight]);
 }
 
 /**
@@ -377,7 +393,9 @@ export function walkTree(
 
 function useColorFunction(
   totalTicks: number,
-  colorScheme: ColorScheme,
+  totalTicksRight: number | undefined,
+  diffMode: 'proportionalDiff' | 'absoluteDiff' | undefined,
+  colorScheme: ColorScheme | ColorSchemeDiff,
   isLight: boolean,
   mutedColor: string,
   rangeMin: number,
@@ -393,8 +411,10 @@ function useColorFunction(
         return mutedColor;
       }
 
-      const barColor =
-        colorScheme === ColorScheme.ValueBased
+      const barColor = totalTicksRight !== undefined
+        ? color(getBarColorByDiff(item.value, item.valueRight ?? 0, totalTicks, totalTicksRight,
+            colorScheme === 'diffColorBlind' ? 'diffColorBlind' : 'default', diffMode))
+        : colorScheme === ColorScheme.ValueBased
           ? getBarColorByValue(item.value, totalTicks, rangeMin, rangeMax)
           : getBarColorByPackage(label, isLight);
 
@@ -410,6 +430,8 @@ function useColorFunction(
     },
     [
       totalTicks,
+      totalTicksRight,
+      diffMode,
       colorScheme,
       isLight,
       rangeMin,
@@ -452,6 +474,16 @@ function useSetupCanvas(
 
 // Renders a text inside the node rectangle. It allows setting alignment of the text left or right which takes effect
 // when text is too long to fit in the rectangle.
+function getProportionalLabel(item: LevelItem, totalTicks: number, totalRight: number): string {
+  const left = item.value - (item.valueRight ?? 0);
+  const leftTotal = totalTicks - totalRight;
+  const baselineShare = leftTotal ? left / leftTotal : 0;
+  const comparisonShare = totalRight ? (item.valueRight ?? 0) / totalRight : 0;
+  if (!baselineShare) return comparisonShare ? 'new' : '0.00%';
+  const change = (comparisonShare - baselineShare) / baselineShare * 100;
+  return `${change > 0 ? '+' : ''}${change.toFixed(2)}%`;
+}
+
 function renderLabel(
   ctx: CanvasRenderingContext2D,
   data: FlameGraphDataContainer,
@@ -461,6 +493,7 @@ function renderLabel(
   x: number,
   y: number,
   textAlign: TextAlign,
+  proportionalLabel?: string,
 ) {
   ctx.save();
   ctx.clip(); // so text does not overflow
@@ -471,21 +504,20 @@ function renderLabel(
     ? displayValue.text + displayValue.suffix
     : displayValue.text;
 
-  // We only measure name here instead of full label because of how we deal with the units and aligning later.
-  const measure = ctx.measureText(label);
   const spaceForTextInRect = width - BAR_TEXT_PADDING_LEFT;
 
-  let fullLabel = `${label} (${unit})`;
+  let fullLabel = `${label} (${proportionalLabel ?? unit})`;
   let labelX = Math.max(x, 0) + BAR_TEXT_PADDING_LEFT;
 
   // We use the desired alignment only if there is not enough space for the text, otherwise we keep left alignment as
   // that will already show full text.
-  if (measure.width > spaceForTextInRect) {
+  if (ctx.measureText(proportionalLabel ? fullLabel : label).width > spaceForTextInRect) {
+    // Keep the parenthesized percentage visible on narrow diff bars.
+    if (proportionalLabel) fullLabel = `(${proportionalLabel}) ${label}`;
     ctx.textAlign = textAlign;
-    // If aligned to the right we don't want to take the space with the unit label as the assumption is user wants to
-    // mainly see the name. This also reflects how pyro/flamegraph works.
     if (textAlign === 'right') {
-      fullLabel = label;
+      // Keep the percentage visible at the right edge in proportional mode.
+      fullLabel = proportionalLabel ? `${label} (${proportionalLabel})` : label;
       labelX = x + width - BAR_TEXT_PADDING_LEFT;
     }
   }

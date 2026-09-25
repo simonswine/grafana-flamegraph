@@ -1,13 +1,14 @@
-.fg-layout-controls, .fg-view-picker { display: flex; align-items: center; gap: 8px; color: var(--text-primary); font-size: var(--text-sm); }
-.fg-layout-controls > div, .fg-segmented { display: inline-flex; }
-.fg-layout-controls button, .fg-view-picker button { background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-medium); padding: 5px 10px; cursor: pointer; font: inherit; }
-.fg-layout-controls button:hover, .fg-view-picker button:hover { background: var(--action-hover); }
-.fg-layout-controls button:focus-visible, .fg-view-picker button:focus-visible { outline: 2px solid var(--action-focus); outline-offset: 2px; }
-.fg-layout-controls button[aria-pressed="true"], .fg-view-picker button[aria-pressed="true"] { background: var(--action-selected); color: var(--color-primary-text); border-color: var(--color-primary-border); }
-.fg-layout-controls button:first-child, .fg-segmented button:first-child { border-radius: var(--radius-md) 0 0 var(--radius-md); }
-.fg-layout-controls button:last-child, .fg-segmented button:last-child { border-radius: 0 var(--radius-md) var(--radius-md) 0; }
-.fg-layout-controls button + button, .fg-segmented button + button { margin-left: -1px; }
-.fg-view-picker { flex-wrap: wrap; flex: none; }
+.fg-layout-controls, .fg-view-picker, .fg-data-picker { display: flex; align-items: center; gap: 8px; color: var(--text-primary); font-size: var(--text-sm); }
+.fg-layout-controls > div, .fg-segmented {  display: inline-flex; }
+.fg-layout-controls button, .fg-view-picker button, .fg-data-picker button { background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-medium); padding: 5px 10px; cursor: pointer; font: inherit; }
+.fg-layout-controls button:hover, .fg-view-picker button:hover, .fg-data-picker button:hover { background: var(--action-hover); }
+.fg-layout-controls button:focus-visible, .fg-view-picker button:focus-visible, .fg-data-picker button:focus-visible { outline: 2px solid var(--action-focus); outline-offset: 2px; }
+.fg-layout-controls button[aria-pressed="true"], .fg-view-picker button[aria-pressed="true"], .fg-data-picker button[aria-pressed="true"] { background: var(--action-selected); color: var(--color-primary-text); border-color: var(--color-primary-border); }
+.fg-layout-controls > div:first-child button:first-child, .fg-segmented button:first-child { border-radius: var(--radius-md) 0 0 var(--radius-md); }
+.fg-layout-controls > div:first-child button:last-child, .fg-segmented button:last-child { border-radius: 0 var(--radius-md) var(--radius-md) 0; }
+.fg-layout-controls > div:first-child button + button, .fg-segmented button + button { margin-left: -1px; }
+.fg-pane-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; flex: none; }
+.fg-view-picker, .fg-data-picker { flex-wrap: wrap; flex: none; }
 .fg-pane-with-picker, .fg-dual-pane { display: flex; flex-direction: column; min-width: 0; min-height: 0; gap: 8px; }
 .fg-pane-with-picker { height: 100%; }
 .fg-pane-content { flex: 1 1 0; min-height: 0; overflow: auto; }

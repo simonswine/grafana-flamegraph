@@ -11,6 +11,7 @@ import './FlameGraphTooltip.css';
 type Props = {
   data: FlameGraphDataContainer;
   totalTicks: number;
+  diffMode?: 'proportionalDiff' | 'absoluteDiff';
   position?: { x: number; y: number };
   item?: LevelItem;
   collapseConfig?: CollapseConfig;
@@ -20,6 +21,7 @@ const FlameGraphTooltip = ({
   data,
   item,
   totalTicks,
+  diffMode,
   position,
   collapseConfig,
 }: Props) => {
@@ -28,6 +30,7 @@ const FlameGraphTooltip = ({
   }
 
   const tooltipData = getTooltipData(data, item, totalTicks);
+  const diff = data.isDiffFlamegraph() ? getDiffTooltipData(data, item, totalTicks, diffMode) : undefined;
 
   return createPortal(
     <div
@@ -48,7 +51,10 @@ const FlameGraphTooltip = ({
             ''
           )}
         </p>
-        <p className="fg-tooltip-last">
+        {diff && <table className="fg-tooltip-diff"><thead><tr><th></th><th>Baseline</th><th>Comparison</th><th>Diff</th></tr></thead>
+          <tbody><tr><th>{diffMode === 'absoluteDiff' ? 'Samples' : 'Total'}</th><td>{diff.baseline}</td><td>{diff.comparison}</td><td>{diff.change}</td></tr>
+          <tr><th>Self</th><td>{diff.selfBaseline}</td><td>{diff.selfComparison}</td><td></td></tr></tbody></table>}
+        {!diff && <p className="fg-tooltip-last">
           {tooltipData.unitTitle}
           <br />
           Total: <b>{tooltipData.unitValue}</b> ({tooltipData.percentValue}%)
@@ -56,7 +62,7 @@ const FlameGraphTooltip = ({
           Self: <b>{tooltipData.unitSelf}</b> ({tooltipData.percentSelf}%)
           <br />
           Samples: <b>{tooltipData.samples}</b>
-        </p>
+        </p>}
       </div>
     </div>,
     document.body,
@@ -107,5 +113,33 @@ export const getTooltipData = (
     samples: displayValue.numeric.toLocaleString(),
   };
 };
+
+export function getDiffTooltipData(data: FlameGraphDataContainer, item: LevelItem, totalTicks: number,
+  diffMode: 'proportionalDiff' | 'absoluteDiff' = 'proportionalDiff') {
+  const totalRight = data.getLevels()[0]?.[0]?.valueRight ?? 0;
+  const totalLeft = totalTicks - totalRight;
+  const right = item.valueRight ?? 0;
+  const left = item.value - right;
+  const pct = (value: number, total: number) => total ? value / total * 100 : 0;
+  const baseline = pct(left, totalLeft);
+  const comparison = pct(right, totalRight);
+  if (diffMode === 'absoluteDiff') {
+    const formatted = data.valueDisplayProcessor(Math.abs(right - left));
+    return {
+      baseline: data.valueDisplayProcessor(left).text + data.valueDisplayProcessor(left).suffix,
+      comparison: data.valueDisplayProcessor(right).text + data.valueDisplayProcessor(right).suffix,
+      change: `${right >= left ? '+' : '−'}${formatted.text}${formatted.suffix ?? ''}`,
+      selfBaseline: data.valueDisplayProcessor(data.getSelf(item.itemIndexes)).text,
+      selfComparison: data.valueDisplayProcessor(data.getSelfRight(item.itemIndexes)).text,
+    };
+  }
+  return {
+    baseline: `${baseline.toFixed(2)}%`,
+    comparison: `${comparison.toFixed(2)}%`,
+    change: baseline ? `${((comparison - baseline) / baseline * 100).toFixed(2)}%` : '—',
+    selfBaseline: `${pct(data.getSelf(item.itemIndexes), totalLeft).toFixed(2)}%`,
+    selfComparison: `${pct(data.getSelfRight(item.itemIndexes), totalRight).toFixed(2)}%`,
+  };
+}
 
 export default FlameGraphTooltip;

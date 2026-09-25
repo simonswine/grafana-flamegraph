@@ -19,7 +19,9 @@ import './pyroscope-theme.css';
 import './FlameGraphContainer.css';
 import './Layout.css';
 import { useColorScheme, useMeasure } from './hooks';
-import { type ClickedItemData, SelectedView, type TextAlign } from './types';
+import { type ClickedItemData, ColorScheme, SelectedView, type TextAlign } from './types';
+
+type DataMode = 'baseline' | 'comparison' | 'proportionalDiff' | 'absoluteDiff';
 
 const ufuzzy = new uFuzzy();
 
@@ -30,6 +32,7 @@ export type Props = {
    * level: number - the nesting level of the node
    * value: number - the total value of the node
    * self: number - the self value of the node
+   * For diff profiles also provide numeric valueRight and selfRight fields.
    */
   data?: DataFrame;
 
@@ -103,12 +106,15 @@ const FlameGraphContainer = ({
   const [leftView, setLeftView] = useState<'flameGraph' | 'topTable' | 'callTree'>('topTable');
   const [rightView, setRightView] = useState<'flameGraph' | 'topTable' | 'callTree'>('flameGraph');
   const [singleView, setSingleView] = useState<'flameGraph' | 'topTable' | 'callTree'>('flameGraph');
+  const [singleDataMode, setSingleDataMode] = useState<DataMode>('proportionalDiff');
+  const [leftDataMode, setLeftDataMode] = useState<DataMode>('baseline');
+  const [rightDataMode, setRightDataMode] = useState<DataMode>('comparison');
   const [selectedView, setSelectedView] = useState<SelectedView>(SelectedView.Both);
   const [sizeRef, { width: containerWidth }] = useMeasure<HTMLDivElement>();
   const [textAlign, setTextAlign] = useState<TextAlign>('left');
   // This is a label of the item because in sandwich view we group all items by label and present a merged graph
   const [sandwichItem, setSandwichItem] = useState<string>();
-  const [collapsedMap, setCollapsedMap] = useState(new CollapsedMap());
+  const [collapsedMaps, setCollapsedMaps] = useState<Partial<Record<DataMode, CollapsedMap>>>({});
 
   // Use refs to hold the latest callback values to prevent unnecessary re-renders
   const onTableSymbolClickRef = useRef(onTableSymbolClick);
@@ -118,18 +124,39 @@ const FlameGraphContainer = ({
   onTableSymbolClickRef.current = onTableSymbolClick;
   onTableSortRef.current = onTableSort;
 
-  const dataContainer = useMemo((): FlameGraphDataContainer | undefined => {
-    if (!data) {
-      return;
-    }
-
-    const container = new FlameGraphDataContainer(data, {
-      collapsing: !disableCollapsing,
+  const isDiffData = Boolean(data?.fields.some((field) => field.name === 'valueRight') &&
+    data?.fields.some((field) => field.name === 'selfRight'));
+  const containers = useMemo(() => {
+    if (!data) return undefined;
+    const make = (mode: DataMode) => {
+      const frame = !isDiffData || mode === 'proportionalDiff' || mode === 'absoluteDiff' ? data : {
+        ...data,
+        fields: data.fields.filter((field) => field.name !== 'valueRight' && field.name !== 'selfRight').map((field) => {
+          if (mode === 'comparison' && (field.name === 'value' || field.name === 'self')) {
+            const right = data.fields.find((candidate) => candidate.name === `${field.name}Right`)!;
+            return { ...right, name: field.name };
+          }
+          return field;
+        }),
+      };
+      return new FlameGraphDataContainer(frame, { collapsing: !disableCollapsing });
+    };
+    const diff = make('proportionalDiff');
+    return { proportionalDiff: diff, absoluteDiff: diff, baseline: make('baseline'), comparison: make('comparison') };
+  }, [data, isDiffData, disableCollapsing]);
+  const dataContainer = containers?.proportionalDiff;
+  useEffect(() => {
+    if (containers) setCollapsedMaps({
+      baseline: containers.baseline.getCollapsedMap(),
+      comparison: containers.comparison.getCollapsedMap(),
+      proportionalDiff: containers.proportionalDiff.getCollapsedMap(),
+      absoluteDiff: containers.absoluteDiff.getCollapsedMap(),
     });
-    setCollapsedMap(container.getCollapsedMap());
-    return container;
-  }, [data, disableCollapsing]);
+  }, [containers]);
   const [colorScheme, setColorScheme] = useColorScheme(dataContainer);
+  const [regularColorScheme, setRegularColorScheme] = useState<ColorScheme>(ColorScheme.PackageBased);
+  const visibleModes = viewMode === 'single' ? [singleDataMode] : [leftDataMode, rightDataMode];
+  const showingDiff = isDiffData && visibleModes.some((mode) => mode === 'proportionalDiff' || mode === 'absoluteDiff');
   const matchedLabels = useLabelSearch(search, dataContainer);
 
   // If user resizes window with both as the selected view
@@ -230,9 +257,14 @@ const FlameGraphContainer = ({
     return null;
   }
 
-  const flameGraph = (
-    <FlameGraph
-      data={dataContainer}
+  const activeCollapsedMap = visibleModes.map((mode) => collapsedMaps[mode] ?? containers![mode].getCollapsedMap())
+    .find((map) => map.size() > 0) ?? dataContainer.getCollapsedMap();
+
+  const flameGraph = (mode: DataMode) => {
+    const paneData = containers![mode];
+    return <FlameGraph
+      key={mode}
+      data={paneData}
       rangeMin={rangeMin}
       rangeMax={rangeMax}
       matchedLabels={matchedLabels}
@@ -245,20 +277,22 @@ const FlameGraphContainer = ({
       onSandwich={onSandwich}
       onFocusPillClick={resetFocus}
       onSandwichPillClick={resetSandwich}
-      colorScheme={colorScheme}
+      colorScheme={mode === 'proportionalDiff' || mode === 'absoluteDiff' ? colorScheme : regularColorScheme}
+      diffMode={mode === 'absoluteDiff' ? mode : 'proportionalDiff'}
       showFlameGraphOnly={showFlameGraphOnly}
       collapsing={!disableCollapsing}
       getExtraContextMenuButtons={getExtraContextMenuButtons}
       selectedView={selectedView}
       search={search}
-      collapsedMap={collapsedMap}
-      setCollapsedMap={setCollapsedMap}
-    />
-  );
+      collapsedMap={collapsedMaps[mode] ?? paneData.getCollapsedMap()}
+      setCollapsedMap={(map) => setCollapsedMaps((previous) => ({ ...previous, [mode]: map }))}
+    />;
+  };
 
-  const table = (
+  const table = (mode: DataMode) => (
     <FlameGraphTopTableContainer
-      data={dataContainer}
+      data={containers![mode]}
+      diffMode={mode === 'absoluteDiff' ? mode : 'proportionalDiff'}
       onSymbolClick={onSymbolClick}
       search={search}
       matchedLabels={matchedLabels}
@@ -269,13 +303,13 @@ const FlameGraphContainer = ({
     />
   );
 
-  const pane = (view: typeof singleView) => view === 'flameGraph' ? flameGraph : view === 'topTable'
-    ? <div className="fg-table-container">{table}</div>
-    : <StacktraceTable data={dataContainer} search={search} onSymbolClick={onSymbolClick} />;
+  const pane = (view: typeof singleView, mode: DataMode) => view === 'flameGraph' ? flameGraph(mode) : view === 'topTable'
+    ? <div className="fg-table-container">{table(mode)}</div>
+    : <StacktraceTable data={containers![mode]} diffMode={mode === 'absoluteDiff' ? mode : 'proportionalDiff'} search={search} onSymbolClick={onSymbolClick} />;
 
   const viewPicker = (view: typeof singleView, position: 'View' | 'Left' | 'Right' | 'Top' | 'Bottom', select: (value: typeof singleView) => void) => (
     <div className="fg-view-picker">
-      <span>{position}</span>
+      <span><span aria-hidden="true">👁️</span> {position}</span>
       <div className="fg-segmented" role="group" aria-label={`${position} pane view`}>
         {([
           ['flameGraph', 'Flame graph'],
@@ -290,6 +324,17 @@ const FlameGraphContainer = ({
       </div>
     </div>
   );
+
+  const dataPicker = (mode: DataMode, position: 'View' | 'Left' | 'Right' | 'Top' | 'Bottom', select: (mode: DataMode) => void) =>
+    isDiffData && <div className="fg-data-picker">
+      <span>Data</span>
+      <div className="fg-segmented" role="group" aria-label={`${position} pane data`}>
+        {(['baseline', 'comparison', 'proportionalDiff', 'absoluteDiff'] as const).map((value) =>
+          <button key={value} type="button" aria-pressed={mode === value} onClick={() => { select(value); resetFocus(); }}>
+            {{ baseline: 'Baseline', comparison: 'Comparison', proportionalDiff: 'Proportional diff', absoluteDiff: 'Absolute diff' }[value]}
+          </button>)}
+      </div>
+    </div>;
 
   return (
     <div ref={sizeRef} className="fg-container">
@@ -311,13 +356,28 @@ const FlameGraphContainer = ({
             onTextAlignSelected?.(align);
           }}
           showResetButton={Boolean(focusedItemData || sandwichItem)}
-          colorScheme={colorScheme}
-          onColorSchemeChange={setColorScheme}
+          colorScheme={showingDiff ? colorScheme : regularColorScheme}
+          isDiffMode={showingDiff}
+          onColorSchemeChange={(scheme) => {
+            if (showingDiff) setColorScheme(scheme);
+            else if (scheme === ColorScheme.PackageBased || scheme === ColorScheme.ValueBased) setRegularColorScheme(scheme);
+          }}
           stickyHeader={Boolean(stickyHeader)}
           extraHeaderElements={extraHeaderElements}
           vertical={vertical}
-          setCollapsedMap={setCollapsedMap}
-          collapsedMap={collapsedMap}
+          setCollapsedMap={(map) => {
+            const collapsed = Array.from(map.values()).every((config) => config.collapsed);
+            setCollapsedMaps((previous) => {
+              const next = { ...previous };
+              for (const mode of ['baseline', 'comparison', 'proportionalDiff', 'absoluteDiff'] as const) {
+                const current = previous[mode] ?? containers![mode].getCollapsedMap();
+                next[mode] = current.setAllCollapsedStatus(collapsed);
+              }
+              return next;
+            });
+          }}
+          collapsedMap={activeCollapsedMap}
+          disableCollapsing={disableCollapsing}
         />
       )}
 
@@ -328,19 +388,22 @@ const FlameGraphContainer = ({
         </div>
 
       </div>}
-      <div className="fg-body">{showFlameGraphOnly ? flameGraph : viewMode === 'single' ?
+      <div className="fg-body">{showFlameGraphOnly ? flameGraph(singleDataMode) : viewMode === 'single' ?
         <div className="fg-pane-with-picker">
-          {viewPicker(singleView, 'View', setSingleView)}
-          <div className="fg-pane-content">{pane(singleView)}</div>
+          <div className="fg-pane-controls">{viewPicker(singleView, 'View', setSingleView)}
+            {dataPicker(singleDataMode, 'View', setSingleDataMode)}</div>
+          <div className="fg-pane-content">{pane(singleView, singleDataMode)}</div>
         </div> :
         <div className={vertical ? 'fg-dual-vertical' : 'fg-dual'}>
           <div className="fg-dual-pane">
-            {viewPicker(leftView, vertical ? 'Top' : 'Left', setLeftView)}
-            <div className="fg-pane-content">{pane(leftView)}</div>
+            <div className="fg-pane-controls">{viewPicker(leftView, vertical ? 'Top' : 'Left', setLeftView)}
+              {dataPicker(leftDataMode, vertical ? 'Top' : 'Left', setLeftDataMode)}</div>
+            <div className="fg-pane-content">{pane(leftView, leftDataMode)}</div>
           </div>
           <div className="fg-dual-pane">
-            {viewPicker(rightView, vertical ? 'Bottom' : 'Right', setRightView)}
-            <div className="fg-pane-content">{pane(rightView)}</div>
+            <div className="fg-pane-controls">{viewPicker(rightView, vertical ? 'Bottom' : 'Right', setRightView)}
+              {dataPicker(rightDataMode, vertical ? 'Bottom' : 'Right', setRightDataMode)}</div>
+            <div className="fg-pane-content">{pane(rightView, rightDataMode)}</div>
           </div>
         </div>}</div>
     </div>

@@ -8,7 +8,7 @@ import { type CollapsedMap } from './FlameGraph/dataTransform';
 import { MIN_WIDTH_TO_SHOW_BOTH_TOPTABLE_AND_FLAMEGRAPH } from './constants';
 import { cx } from './cx';
 import { useDebounce, usePrevious } from './hooks';
-import { type ColorScheme, SelectedView, type TextAlign } from './types';
+import { type ColorScheme, type ColorSchemeDiff, SelectedView, type TextAlign } from './types';
 
 import './FlameGraphHeader.css';
 
@@ -23,12 +23,14 @@ type Props = {
   textAlign: TextAlign;
   onTextAlignChange: (align: TextAlign) => void;
   showResetButton: boolean;
-  colorScheme: ColorScheme;
-  onColorSchemeChange: (colorScheme: ColorScheme) => void;
+  colorScheme: ColorScheme | ColorSchemeDiff;
+  onColorSchemeChange: (colorScheme: ColorScheme | ColorSchemeDiff) => void;
+  isDiffMode?: boolean;
   stickyHeader: boolean;
   vertical?: boolean;
   setCollapsedMap: (collapsedMap: CollapsedMap) => void;
   collapsedMap: CollapsedMap;
+  disableCollapsing?: boolean;
 
   extraHeaderElements?: React.ReactNode;
 };
@@ -95,12 +97,12 @@ const FlameGraphHeader = (props: Props) => {
             onClick={onReset}
           />
         )}
-        <ColorSchemeButton value={colorScheme} onChange={onColorSchemeChange} />
+        <ColorSchemeButton value={colorScheme} onChange={onColorSchemeChange} isDiffMode={props.isDiffMode} />
         <div className={cx('fg-header-btn-group', 'fg-header-spacing-right')}>
           <IconBtn
             icon="angle-double-down"
             label="Expand all groups"
-            disabled={tableOnly}
+            disabled={tableOnly || props.disableCollapsing || collapsedMap.size() === 0}
             onClick={() =>
               setCollapsedMap(collapsedMap.setAllCollapsedStatus(false))
             }
@@ -109,7 +111,7 @@ const FlameGraphHeader = (props: Props) => {
           <IconBtn
             icon="angle-double-up"
             label="Collapse all groups"
-            disabled={tableOnly}
+            disabled={tableOnly || props.disableCollapsing || collapsedMap.size() === 0}
             onClick={() =>
               setCollapsedMap(collapsedMap.setAllCollapsedStatus(true))
             }
@@ -123,8 +125,8 @@ const FlameGraphHeader = (props: Props) => {
           disabled={tableOnly}
           className="fg-header-spacing-right"
           options={[
-            { value: 'left', title: 'Align text left', icon: 'align-left' },
-            { value: 'right', title: 'Align text right', icon: 'align-right' },
+            { value: 'left', title: 'Align clipped text left', icon: 'align-left' },
+            { value: 'right', title: 'Align clipped text right', icon: 'align-right' },
           ]}
         />
         {!props.hideViewSelector && <RadioGroup

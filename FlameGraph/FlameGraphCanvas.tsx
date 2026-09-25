@@ -13,6 +13,7 @@ import { PIXELS_PER_LEVEL } from '../constants';
 import {
   type ClickedItemData,
   type ColorScheme,
+  type ColorSchemeDiff,
   type SelectedView,
   type TextAlign,
 } from '../types';
@@ -42,7 +43,7 @@ type Props = {
   focusedItemData?: ClickedItemData;
   textAlign: TextAlign;
   onSandwich: (label: string) => void;
-  colorScheme: ColorScheme;
+  colorScheme: ColorScheme | ColorSchemeDiff;
 
   root: LevelItem;
   direction: 'children' | 'parents';
@@ -50,6 +51,9 @@ type Props = {
   depth: number;
 
   totalViewTicks: number;
+  totalProfileTicks?: number;
+  totalProfileTicksRight?: number;
+  diffMode?: 'proportionalDiff' | 'absoluteDiff';
   showFlameGraphOnly?: boolean;
 
   collapsedMap: CollapsedMap;
@@ -74,6 +78,9 @@ const FlameGraphCanvas = ({
   onSandwich,
   colorScheme,
   totalViewTicks,
+  totalProfileTicks,
+  totalProfileTicksRight,
+  diffMode,
   root,
   direction,
   depth,
@@ -104,7 +111,9 @@ const FlameGraphCanvas = ({
     matchedLabels,
     textAlign,
     totalViewTicks,
-    totalColorTicks: totalViewTicks,
+    totalColorTicks: totalProfileTicks ?? totalViewTicks,
+    totalTicksRight: totalProfileTicksRight,
+    diffMode,
     wrapperWidth,
     collapsedMap,
   });
@@ -231,7 +240,8 @@ const FlameGraphCanvas = ({
         position={mousePosition}
         item={tooltipItem}
         data={data}
-        totalTicks={totalViewTicks}
+        totalTicks={totalProfileTicks ?? totalViewTicks}
+        diffMode={diffMode}
         collapseConfig={tooltipItem ? collapsedMap.get(tooltipItem) : undefined}
       />
       {!showFlameGraphOnly && clickedItemData && (

@@ -5,6 +5,8 @@
   },
   "exclude": [
     "stories",
+    "tests",
+    "vitest.config.ts",
     ".storybook",
     "dist",
     "node_modules",

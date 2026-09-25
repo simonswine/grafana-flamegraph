@@ -10,6 +10,7 @@ import './FlameGraphTopTableContainer.css';
 
 type Props = {
   data: FlameGraphDataContainer;
+  diffMode?: 'proportionalDiff' | 'absoluteDiff';
   onSymbolClick: (symbol: string) => void;
   // This is used for highlighting the search button in case there is exact match.
   search?: string;
@@ -21,11 +22,11 @@ type Props = {
   onTableSort?: (sort: string) => void;
 };
 
-type SortColumn = 'Symbol' | 'Self' | 'Total';
+type SortColumn = 'Symbol' | 'Self' | 'Total' | 'Baseline' | 'Comparison' | 'Diff';
 type SortDirection = 'asc' | 'desc';
 type SortState = { column: SortColumn; direction: SortDirection };
 
-type Row = { symbol: string; self: number; total: number };
+type Row = { symbol: string; self: number; total: number; totalRight: number };
 
 // Rows are uniform — measured from a default-styled <tr>. Adjusting this is
 // a one-character change but the virtualizer math depends on it being exact.
@@ -36,6 +37,7 @@ const HEADER_HEIGHT = 27;
 const FlameGraphTopTableContainer = memo(
   ({
     data,
+    diffMode,
     onSymbolClick,
     search,
     matchedLabels,
@@ -49,12 +51,13 @@ const FlameGraphTopTableContainer = memo(
       return Object.entries(grouped).map(([symbol, v]) => ({
         symbol,
         self: v.self ?? 0,
-        total: v.total ?? 0,
+        total: (v.total ?? 0) + (v.totalRight ?? 0),
+        totalRight: v.totalRight ?? 0,
       }));
     }, [data, matchedLabels]);
 
     const [sort, setSort] = useState<SortState>({
-      column: 'Self',
+      column: data.isDiffFlamegraph() ? 'Baseline' : 'Self',
       direction: 'desc',
     });
 
@@ -64,12 +67,27 @@ const FlameGraphTopTableContainer = memo(
       copy.sort((a, b) => {
         if (sort.column === 'Symbol')
           return a.symbol.localeCompare(b.symbol) * dir;
-        const av = sort.column === 'Self' ? a.self : a.total;
-        const bv = sort.column === 'Self' ? b.self : b.total;
+        const leftTotal = data.getValue(0), rightTotal = data.getValueRight(0);
+        const metric = (row: Row) => {
+          const left = row.total - row.totalRight;
+          const right = row.totalRight;
+          if (sort.column === 'Self') return row.self;
+          if (sort.column === 'Comparison') return diffMode === 'absoluteDiff' ? right : rightTotal ? right / rightTotal : 0;
+          if (sort.column === 'Baseline') return diffMode === 'absoluteDiff' ? left : leftTotal ? left / leftTotal : 0;
+          if (sort.column === 'Diff') {
+            if (diffMode === 'absoluteDiff') return right - left;
+            const baseline = leftTotal ? left / leftTotal : 0;
+            const comparison = rightTotal ? right / rightTotal : 0;
+            return baseline ? (comparison - baseline) / baseline : comparison ? 1 : 0;
+          }
+          return row.total;
+        };
+        const av = metric(a);
+        const bv = metric(b);
         return (av - bv) * dir;
       });
       return copy;
-    }, [rows, sort]);
+    }, [rows, sort, data, diffMode]);
 
     const handleSort = useCallback(
       (column: SortColumn) => {
@@ -144,34 +162,27 @@ const FlameGraphTopTableContainer = memo(
                   onClick={handleSort}
                   className={'fg-tt-symbol-header'}
                 />
-                <SortHeader
-                  column="Self"
-                  active={sort.column === 'Self'}
-                  direction={sort.direction}
-                  align="right"
-                  onClick={handleSort}
-                  className={'fg-tt-numeric-header'}
-                />
-                <SortHeader
-                  column="Total"
-                  active={sort.column === 'Total'}
-                  direction={sort.direction}
-                  align="right"
-                  onClick={handleSort}
-                  className={'fg-tt-numeric-header'}
-                />
+                {data.isDiffFlamegraph() ? (['Baseline', 'Comparison', 'Diff'] as const).map((column) =>
+                  <SortHeader key={column} column={column} active={sort.column === column} direction={sort.direction}
+                    align="right" onClick={handleSort} className={'fg-tt-numeric-header'} />) : <>
+                  <SortHeader column="Self" active={sort.column === 'Self'} direction={sort.direction}
+                    align="right" onClick={handleSort} className={'fg-tt-numeric-header'} />
+                  <SortHeader column="Total" active={sort.column === 'Total'} direction={sort.direction}
+                    align="right" onClick={handleSort} className={'fg-tt-numeric-header'} />
+                </>}
               </tr>
             </thead>
             <tbody>
               {padTop > 0 && (
                 <tr aria-hidden="true" style={{ height: padTop }}>
-                  <td colSpan={4} />
+                  <td colSpan={data.isDiffFlamegraph() ? 5 : 4} />
                 </tr>
               )}
               {sortedRows.slice(startIdx, endIdx).map((row) => (
                 <TableRow
                   key={row.symbol}
                   data={data}
+                  diffMode={diffMode}
                   row={row}
                   search={search}
                   sandwichItem={sandwichItem}
@@ -182,7 +193,7 @@ const FlameGraphTopTableContainer = memo(
               ))}
               {padBottom > 0 && (
                 <tr aria-hidden="true" style={{ height: padBottom }}>
-                  <td colSpan={4} />
+                  <td colSpan={data.isDiffFlamegraph() ? 5 : 4} />
                 </tr>
               )}
             </tbody>
@@ -242,6 +253,7 @@ const SortHeader = memo(SortHeaderInner);
 type TableRowProps = {
   data: FlameGraphDataContainer;
   row: Row;
+  diffMode?: 'proportionalDiff' | 'absoluteDiff';
   search?: string;
   sandwichItem?: string;
   onSymbolClick: (symbol: string) => void;
@@ -252,6 +264,7 @@ type TableRowProps = {
 function TableRowInner({
   data,
   row,
+  diffMode,
   search,
   sandwichItem,
   onSymbolClick,
@@ -313,8 +326,24 @@ function TableRowInner({
           {row.symbol}
         </a>
       </td>
-      <td className={'fg-tt-numeric-cell'}>{formatValue(selfDisp)}</td>
-      <td className={'fg-tt-numeric-cell'}>{formatValue(totalDisp)}</td>
+      {data.isDiffFlamegraph() ? (() => {
+        const leftTotal = data.getValue(0), rightTotal = data.getValueRight(0);
+        const baseline = leftTotal ? (row.total - row.totalRight) / leftTotal * 100 : 0;
+        const comparison = rightTotal ? row.totalRight / rightTotal * 100 : 0;
+        const diff = baseline ? (comparison - baseline) / baseline * 100 : 0;
+        if (diffMode === 'absoluteDiff') {
+          const left = row.total - row.totalRight, right = row.totalRight;
+          const delta = right - left;
+          return <><td className="fg-tt-numeric-cell">{formatValue(data.valueDisplayProcessor(left))}</td>
+            <td className="fg-tt-numeric-cell">{formatValue(data.valueDisplayProcessor(right))}</td>
+            <td className="fg-tt-numeric-cell" style={{ color: delta > 0 ? 'var(--red-300)' : 'var(--green-300)' }}>
+              {delta >= 0 ? '+' : '−'}{formatValue(data.valueDisplayProcessor(Math.abs(delta)))}</td></>;
+        }
+        return <><td className="fg-tt-numeric-cell">{baseline.toFixed(2)}%</td>
+          <td className="fg-tt-numeric-cell">{comparison.toFixed(2)}%</td>
+          <td className="fg-tt-numeric-cell" style={{ color: diff > 0 ? 'var(--red-300)' : 'var(--green-300)' }}>{baseline ? `${diff.toFixed(2)}%` : '—'}</td></>;
+      })() : <><td className={'fg-tt-numeric-cell'}>{formatValue(selfDisp)}</td>
+      <td className={'fg-tt-numeric-cell'}>{formatValue(totalDisp)}</td></>}
     </tr>
   );
 }
@@ -365,6 +394,7 @@ export function buildFilteredTable(
   for (let i = 0; i < data.data.length; i++) {
     const value = data.getValue(i);
     const self = data.getSelf(i);
+    const valueRight = data.getValueRight(i);
     const label = data.getLabel(i);
     const level = data.getLevel(i);
 
@@ -384,6 +414,7 @@ export function buildFilteredTable(
         filteredTable[label].total = filteredTable[label].total
           ? filteredTable[label].total + value
           : value;
+        filteredTable[label].totalRight = (filteredTable[label].totalRight ?? 0) + valueRight;
       }
     }
 

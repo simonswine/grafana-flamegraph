@@ -45,7 +45,8 @@
     "typecheck": "tsc --emitDeclarationOnly false --noEmit",
     "prepack": "pnpm run build",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build"
+    "build-storybook": "storybook build",
+    "test": "vitest run"
   },
   "browserslist": [
     "defaults",
@@ -61,11 +62,14 @@
     "@rsbuild/core": "^2.1.9",
     "@rsbuild/plugin-react": "^2.1.0",
     "@storybook/react": "10.3.6",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.7",
     "@types/node": "24.10.1",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.3",
     "@types/tinycolor2": "1.4.6",
     "esbuild": "0.28.1",
+    "jsdom": "^30.1.1",
     "react-dom": "^19.2.8",
     "rollup": "^4.60.1",
     "rollup-plugin-esbuild": "6.2.1",
@@ -73,7 +77,8 @@
     "rollup-plugin-postcss": "^4.0.2",
     "storybook": "10.3.6",
     "storybook-react-rsbuild": "3.3.4",
-    "typescript": "npm:@typescript/typescript6@^6.0.2"
+    "typescript": "npm:@typescript/typescript6@^6.0.2",
+    "vitest": "^5.0.2"
   },
   "peerDependencies": {
     "react": ">=19",

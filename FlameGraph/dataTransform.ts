@@ -38,6 +38,8 @@ export type LevelItem = {
   // Value here can be different from a value of items in the data frame as for callers tree in sandwich view we have
   // to trim the value to correspond only to the part used by the children in the subtree.
   value: number;
+  /** Comparison-side value for diff profiles. */
+  valueRight?: number;
   // Index into the data frame. It is an array because for sandwich views we may be merging multiple items into single
   // node.
   itemIndexes: number[];
@@ -76,7 +78,7 @@ export function nestedSetToLevels(
       // So we have to compute the correct offset based on the last sibling.
       const lastSibling = levels[currentLevel][levels[currentLevel].length - 1];
       offset =
-        lastSibling.start + container.getValue(lastSibling.itemIndexes[0]);
+        lastSibling.start + lastSibling.value;
       // we assume there is always a single root node so lastSibling should always have a parent.
       // Also it has to have the same parent because of how the items are ordered.
       parent = lastSibling.parents![0];
@@ -84,7 +86,8 @@ export function nestedSetToLevels(
 
     const newItem: LevelItem = {
       itemIndexes: [i],
-      value: container.getValue(i),
+      value: container.getValue(i) + container.getValueRight(i),
+      valueRight: container.isDiffFlamegraph() ? container.getValueRight(i) : undefined,
       start: offset,
       parents: parent && [parent],
       children: [],
@@ -300,6 +303,8 @@ export class FlameGraphDataContainer {
   levelField: Field;
   valueField: Field;
   selfField: Field;
+  valueRightField?: Field;
+  selfRightField?: Field;
 
   labelDisplayProcessor: DisplayProcessor;
   valueDisplayProcessor: DisplayProcessor;
@@ -322,6 +327,14 @@ export class FlameGraphDataContainer {
     this.levelField = data.fields.find((f) => f.name === 'level')!;
     this.valueField = data.fields.find((f) => f.name === 'value')!;
     this.selfField = data.fields.find((f) => f.name === 'self')!;
+    this.valueRightField = data.fields.find((f) => f.name === 'valueRight');
+    this.selfRightField = data.fields.find((f) => f.name === 'selfRight');
+    if (Boolean(this.valueRightField) !== Boolean(this.selfRightField)) {
+      throw new Error('Diff profiles require both valueRight and selfRight fields.');
+    }
+    for (const field of [this.valueRightField, this.selfRightField]) {
+      if (field && field.type !== FieldType.number) throw new Error(`${field.name} must be numeric.`);
+    }
 
     const enumConfig = this.labelField?.config?.type?.enum;
     // Labels can come as enum-encoded indexes (DataFrame enum field, where
@@ -367,6 +380,18 @@ export class FlameGraphDataContainer {
 
   getSelf(index: number | number[]) {
     return fieldAccessor(this.selfField, index);
+  }
+
+  isDiffFlamegraph() {
+    return Boolean(this.valueRightField && this.selfRightField);
+  }
+
+  getValueRight(index: number | number[]) {
+    return fieldAccessor(this.valueRightField, index);
+  }
+
+  getSelfRight(index: number | number[]) {
+    return fieldAccessor(this.selfRightField, index);
   }
 
   getSelfDisplay(index: number | number[]) {

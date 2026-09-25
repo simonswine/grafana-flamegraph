@@ -1,3 +1,8 @@
+.fg-diff-legend { padding: 12px 8px; color: var(--text-primary); font-size: var(--text-sm); }
+.fg-diff-legend-scale { height: 8px; border-radius: var(--radius-md); }
+.fg-diff-legend-labels { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; margin: 6px 0; }
+.fg-diff-legend small { color: var(--text-secondary); line-height: 1.4; }
+
 .fg-graph {
   overflow: auto;
   flex-grow: 1;

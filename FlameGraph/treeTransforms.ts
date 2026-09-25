@@ -64,6 +64,7 @@ function getParentSubtrees(roots: LevelItem[]) {
 
       if (args.child) {
         newNode.value = args.child.value;
+        newNode.valueRight = args.child.valueRight;
         args.child.parents = [newNode];
       }
 
@@ -101,6 +102,9 @@ export function mergeSubtrees(
     const newItem: LevelItem = {
       // We use the items value instead of value from the data frame, cause we could have changed it in the process
       value: args.items.reduce((acc, i) => acc + i.value, 0),
+      valueRight: args.items.some((i) => i.valueRight !== undefined)
+        ? args.items.reduce((acc, i) => acc + (i.valueRight ?? 0), 0)
+        : undefined,
       itemIndexes: indexes,
       // these will change later
       children: [],

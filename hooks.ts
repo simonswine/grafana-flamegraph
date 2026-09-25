@@ -7,16 +7,22 @@ import {
 } from 'react';
 
 import { type FlameGraphDataContainer } from './FlameGraph/dataTransform';
-import { ColorScheme } from './types';
+import { ColorScheme, ColorSchemeDiff } from './types';
 
 /**
- * Manages the color scheme state. Kept as a hook to mirror upstream's call
- * site even though the diff-aware reset logic has been removed.
+ * Reset the color scheme when switching between regular and diff profiles.
  */
 export function useColorScheme(
   _dataContainer: FlameGraphDataContainer | undefined,
 ) {
-  return useState<ColorScheme>(ColorScheme.PackageBased);
+  const isDiff = _dataContainer?.isDiffFlamegraph() ?? false;
+  const [scheme, setScheme] = useState<ColorScheme | ColorSchemeDiff>(
+    isDiff ? ColorSchemeDiff.Default : ColorScheme.PackageBased,
+  );
+  useEffect(() => {
+    setScheme(isDiff ? ColorSchemeDiff.Default : ColorScheme.PackageBased);
+  }, [isDiff]);
+  return [scheme, setScheme] as const;
 }
 
 /**
