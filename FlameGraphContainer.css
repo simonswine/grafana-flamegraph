@@ -28,11 +28,14 @@
 
 .fg-horizontal-graph {
   flex-basis: 50%;
+  min-width: 0;
 }
 
 .fg-horizontal-table {
   flex-basis: 50%;
+  min-width: 0;
   max-height: 800px;
+  overflow: auto;
 }
 
 .fg-vertical-graph {

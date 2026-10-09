@@ -88,9 +88,7 @@ const FlameGraph = ({
   setCollapsedMap,
   selectedView,
 }: Props) => {
-  // PIXELS_PER_LEVEL depends on devicePixelRatio so it's computed at runtime
-  // rather than baked into the .css file. Used to space sandwich canvases.
-  const sandwichMargin = `${PIXELS_PER_LEVEL / window.devicePixelRatio}px`;
+  const sandwichMargin = `${PIXELS_PER_LEVEL}px`;
 
   const [levels, setLevels] = useState<LevelItem[][]>();
   const [levelsCallers, setLevelsCallers] = useState<LevelItem[][]>();

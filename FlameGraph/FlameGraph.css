@@ -27,8 +27,7 @@
 
 .fg-sandwich-canvas-wrapper {
   display: flex;
-  /* margin-bottom is set inline per-render because it depends on
-     devicePixelRatio + PIXELS_PER_LEVEL constant. */
+  /* margin-bottom is set inline using the CSS-pixel PIXELS_PER_LEVEL constant. */
 }
 
 .fg-sandwich-marker {

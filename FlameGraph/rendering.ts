@@ -87,7 +87,11 @@ export function useFlameRender(options: RenderOptions) {
     focusedItemData,
     collapsedMap,
   } = options;
-  const ctx = useSetupCanvas(canvasRef, wrapperWidth, depth);
+  const { ctx, devicePixelRatio } = useSetupCanvas(
+    canvasRef,
+    wrapperWidth,
+    depth,
+  );
   const isLight = useIsLight();
 
   // There is a bit of dependency injections here that does not add readability, mainly to prevent recomputing some
@@ -155,6 +159,7 @@ export function useFlameRender(options: RenderOptions) {
           renderFunc(item, x, y, width, height, label);
         }
       },
+      1, // Draw in CSS pixels; the canvas transform applies the current DPR.
     );
 
     // Only fill the muted rects
@@ -172,6 +177,7 @@ export function useFlameRender(options: RenderOptions) {
     renderFunc,
     collapsedMap,
     mutedColor,
+    devicePixelRatio,
   ]);
 }
 
@@ -350,6 +356,7 @@ export function walkTree(
   wrapperWidth: number,
   collapsedMap: CollapsedMap,
   renderFunc: RenderFuncWrap,
+  dpr = window.devicePixelRatio,
 ) {
   // The levelOffset here is to keep track if items that we don't render because they are collapsed into single row.
   // That means we have to render next items with an offset of some rows up in the stack.
@@ -357,20 +364,18 @@ export function walkTree(
   stack.push({ item: root, levelOffset: 0 });
 
   const pixelsPerTick =
-    (wrapperWidth * window.devicePixelRatio) /
-    totalViewTicks /
-    (rangeMax - rangeMin);
+    (wrapperWidth * dpr) / totalViewTicks / (rangeMax - rangeMin);
   let collapsedItemRendered: LevelItem | undefined;
 
   while (stack.length > 0) {
     const { item, levelOffset } = stack.shift()!;
     const curBarTicks = item.value;
-    const muted = curBarTicks * pixelsPerTick <= MUTE_THRESHOLD;
+    const muted = curBarTicks * pixelsPerTick <= MUTE_THRESHOLD * dpr;
     const width =
-      curBarTicks * pixelsPerTick - (muted ? 0 : BAR_BORDER_WIDTH * 2);
-    const height = PIXELS_PER_LEVEL;
+      curBarTicks * pixelsPerTick - (muted ? 0 : BAR_BORDER_WIDTH * dpr * 2);
+    const height = PIXELS_PER_LEVEL * dpr;
 
-    if (width < HIDE_THRESHOLD) {
+    if (width < HIDE_THRESHOLD * dpr) {
       // We don't render nor it's children
       continue;
     }
@@ -396,7 +401,7 @@ export function walkTree(
 
     if (!skipRender) {
       const barX = getBarX(item.start, totalViewTicks, rangeMin, pixelsPerTick);
-      const barY = (item.level + levelOffset) * PIXELS_PER_LEVEL;
+      const barY = (item.level + levelOffset) * PIXELS_PER_LEVEL * dpr;
 
       const label = data.getLabel(item.itemIndexes[0]);
       if (isCollapsedItem) {
@@ -479,12 +484,29 @@ function useColorFunction(
   );
 }
 
+// Re-arm the resolution query after each display or browser zoom change.
+function useDevicePixelRatio() {
+  const [dpr, setDpr] = useState(window.devicePixelRatio);
+  useEffect(() => {
+    const onChange = () => setDpr(window.devicePixelRatio);
+    const query = window.matchMedia(`(resolution: ${dpr}dppx)`);
+    query.addEventListener('change', onChange);
+    window.visualViewport?.addEventListener('resize', onChange);
+    return () => {
+      query.removeEventListener('change', onChange);
+      window.visualViewport?.removeEventListener('resize', onChange);
+    };
+  }, [dpr]);
+  return dpr;
+}
+
 function useSetupCanvas(
   canvasRef: RefObject<HTMLCanvasElement | null>,
   wrapperWidth: number,
   numberOfLevels: number,
 ) {
   const [ctx, setCtx] = useState<CanvasRenderingContext2D>();
+  const devicePixelRatio = useDevicePixelRatio();
 
   useEffect(() => {
     if (!(numberOfLevels && canvasRef.current)) {
@@ -493,19 +515,18 @@ function useSetupCanvas(
     const ctx = canvasRef.current.getContext('2d')!;
 
     const height = PIXELS_PER_LEVEL * numberOfLevels;
-    canvasRef.current.width = Math.round(
-      wrapperWidth * window.devicePixelRatio,
-    );
-    canvasRef.current.height = Math.round(height);
+    canvasRef.current.width = Math.round(wrapperWidth * devicePixelRatio);
+    canvasRef.current.height = Math.round(height * devicePixelRatio);
     canvasRef.current.style.width = `${wrapperWidth}px`;
-    canvasRef.current.style.height = `${height / window.devicePixelRatio}px`;
+    canvasRef.current.style.height = `${height}px`;
 
+    ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
     ctx.textBaseline = 'middle';
-    ctx.font = 12 * window.devicePixelRatio + 'px monospace';
+    ctx.font = '12px monospace';
     ctx.strokeStyle = 'white';
     setCtx(ctx);
-  }, [canvasRef, setCtx, wrapperWidth, numberOfLevels]);
-  return ctx;
+  }, [canvasRef, setCtx, wrapperWidth, numberOfLevels, devicePixelRatio]);
+  return { ctx, devicePixelRatio };
 }
 
 // Renders a text inside the node rectangle. It allows setting alignment of the text left or right which takes effect
