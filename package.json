@@ -1,7 +1,7 @@
 {
   "author": "Grafana Labs",
   "license": "Apache-2.0",
-  "name": "grafana-flamegraph",
+  "name": "@simonswine/grafana-flamegraph",
   "version": "0.1.0",
   "packageManager": "pnpm@12.6.0",
   "description": "Grafana flamegraph visualization component",
