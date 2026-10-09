@@ -1,2 +1,6 @@
 allowBuilds:
   esbuild: true
+
+# GHSA-rj75-hqrm-r3gf: older cssnano dependencies otherwise retain vulnerable parsers.
+overrides:
+  postcss-selector-parser: ^7.1.6
